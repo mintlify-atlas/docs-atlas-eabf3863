@@ -1,0 +1,327 @@
+---
+title: 'Training plans'
+description: 'Manage training plans and routine details for students and trainers.'
+keywords: ['training plans', 'planes', 'rutina', 'detallerutina', 'workout']
+---
+
+Training plans (`PlanEntrenamiento`) represent structured workout programs. A plan can be **global** (visible to all students) or **personalized** (assigned to a specific student). Each plan may include an attached PDF and an optional expiry date. Routine line items (`DetalleRutina`) attach individual exercises with sets, reps, and rest periods to a plan.
+
+## Global vs. personalized plans
+
+<Note>
+When `alumno_asignado` is `null`, the plan is global and visible to every authenticated student. When set to a specific user ID, only that student and trainers/admins can see it.
+</Note>
+
+## Plan auto-expiry
+
+<Note>
+Every `GET /api/planes/` call automatically deletes any plan whose `fecha_vencimiento` is in the past before returning results. Deleted plans are not recoverable via the API.
+</Note>
+
+---
+
+## List training plans
+
+<Warning>
+Requires authentication. Students receive only global plans plus their own personal plans. Trainers and admins receive all plans, ordered by `fecha_vencimiento` descending.
+</Warning>
+
+```
+GET /api/planes/
+```
+
+### Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique plan identifier.
+</ResponseField>
+
+<ResponseField name="titulo" type="string" required>
+  Plan title.
+</ResponseField>
+
+<ResponseField name="es_global" type="boolean" required>
+  `true` if the plan is visible to all students; `false` if it is personalized.
+</ResponseField>
+
+<ResponseField name="alumno_asignado" type="integer | null">
+  ID of the student the plan is assigned to. `null` for global plans.
+</ResponseField>
+
+<ResponseField name="archivo_adjunto" type="string | null">
+  URL to the attached PDF file, or `null` if none.
+</ResponseField>
+
+<ResponseField name="fecha_vencimiento" type="string | null">
+  Expiry date in `YYYY-MM-DD` format. The plan is automatically deleted after this date.
+</ResponseField>
+
+<ResponseField name="creado_por_nombre" type="string">
+  Full name of the trainer who created the plan. Read-only.
+</ResponseField>
+
+<ResponseField name="rutina_interactiva" type="object[]">
+  <Expandable title="DetalleRutina properties">
+    <ResponseField name="id" type="integer">
+      Routine item identifier.
+    </ResponseField>
+    <ResponseField name="plan" type="integer">
+      ID of the parent plan.
+    </ResponseField>
+    <ResponseField name="ejercicio" type="integer">
+      ID of the exercise from the catalog.
+    </ResponseField>
+    <ResponseField name="ejercicio_detalle" type="object">
+      <Expandable title="EjercicioCatalogo properties">
+        <ResponseField name="id" type="integer">
+          Exercise ID.
+        </ResponseField>
+        <ResponseField name="nombre" type="string">
+          Exercise name.
+        </ResponseField>
+        <ResponseField name="grupo_muscular" type="string">
+          Target muscle group.
+        </ResponseField>
+        <ResponseField name="descripcion" type="string">
+          Exercise description.
+        </ResponseField>
+        <ResponseField name="video_url" type="string">
+          URL to a demonstration video.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="series" type="integer">
+      Number of sets.
+    </ResponseField>
+    <ResponseField name="repeticiones" type="string">
+      Rep range or instruction, e.g. `"10-12"` or `"Al fallo"`.
+    </ResponseField>
+    <ResponseField name="descanso_segundos" type="integer">
+      Rest period in seconds. Defaults to `60`.
+    </ResponseField>
+    <ResponseField name="notas" type="string">
+      Optional trainer notes for this exercise.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/planes/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 1,
+    "titulo": "Plan Fuerza General",
+    "es_global": true,
+    "alumno_asignado": null,
+    "archivo_adjunto": "https://api.example.com/media/planes/plan_fuerza.pdf",
+    "fecha_vencimiento": "2026-12-31",
+    "creado_por_nombre": "Carlos Pérez",
+    "rutina_interactiva": [
+      {
+        "id": 5,
+        "plan": 1,
+        "ejercicio": 3,
+        "ejercicio_detalle": {
+          "id": 3,
+          "nombre": "Sentadilla",
+          "grupo_muscular": "Piernas",
+          "descripcion": "Ejercicio compuesto para tren inferior.",
+          "video_url": "https://example.com/videos/sentadilla"
+        },
+        "series": 4,
+        "repeticiones": "8-10",
+        "descanso_segundos": 90,
+        "notas": "Mantener espalda recta"
+      }
+    ]
+  }
+]
+```
+
+---
+
+## Create a training plan
+
+<Warning>
+Requires authentication. Intended for trainers; `creado_por` is auto-set to the authenticated user. To attach a PDF, send the request as `multipart/form-data`.
+</Warning>
+
+```
+POST /api/planes/
+```
+
+### Request parameters
+
+<ParamField body="titulo" type="string" required>
+  Plan title.
+</ParamField>
+
+<ParamField body="es_global" type="boolean" required>
+  Set `true` to make the plan visible to all students.
+</ParamField>
+
+<ParamField body="alumno_asignado" type="integer">
+  ID of the student to assign the plan to. Omit or set `null` for a global plan.
+</ParamField>
+
+<ParamField body="archivo_adjunto" type="file">
+  PDF file to attach to the plan. Use `multipart/form-data` encoding.
+</ParamField>
+
+<ParamField body="fecha_vencimiento" type="string">
+  Expiry date in `YYYY-MM-DD` format. The plan is auto-deleted after this date on the next list request.
+</ParamField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/planes/ \
+  --header 'Authorization: Bearer <token>' \
+  --form 'titulo=Plan Hipertrofia Avanzado' \
+  --form 'es_global=false' \
+  --form 'alumno_asignado=42' \
+  --form 'fecha_vencimiento=2026-06-30' \
+  --form 'archivo_adjunto=@/path/to/plan.pdf'
+```
+
+```json
+{
+  "id": 7,
+  "titulo": "Plan Hipertrofia Avanzado",
+  "es_global": false,
+  "alumno_asignado": 42,
+  "archivo_adjunto": "https://api.example.com/media/planes/plan_hipertrofia.pdf",
+  "fecha_vencimiento": "2026-06-30",
+  "creado_por_nombre": "Carlos Pérez",
+  "rutina_interactiva": []
+}
+```
+
+---
+
+## Retrieve a training plan
+
+```
+GET /api/planes/{id}/
+```
+
+Returns the full plan object with `rutina_interactiva` expanded. Same response shape as the list endpoint items.
+
+<Warning>
+Students can only retrieve plans that are global or assigned to them. Trainers and admins can retrieve any plan.
+</Warning>
+
+---
+
+## Update a training plan
+
+```
+PUT /api/planes/{id}/
+PATCH /api/planes/{id}/
+```
+
+Use `PUT` to replace all fields or `PATCH` for partial updates. To replace the attached PDF, send a new `archivo_adjunto` file.
+
+---
+
+## Delete a training plan
+
+```
+DELETE /api/planes/{id}/
+```
+
+Permanently removes the plan and its associated routine items.
+
+---
+
+## List routine items
+
+<Warning>
+Trainer or Admin role required for all `/api/detallerutina/` operations.
+</Warning>
+
+```
+GET /api/detallerutina/
+```
+
+Returns all `DetalleRutina` records. Filter by plan in the consuming application.
+
+---
+
+## Add a routine item
+
+```
+POST /api/detallerutina/
+```
+
+Associates an exercise from the catalog with a training plan, specifying sets, reps, and rest.
+
+### Request parameters
+
+<ParamField body="plan" type="integer" required>
+  ID of the training plan to attach this item to.
+</ParamField>
+
+<ParamField body="ejercicio" type="integer" required>
+  ID of the exercise from `/api/ejercicios/`.
+</ParamField>
+
+<ParamField body="series" type="integer" required>
+  Number of sets to perform.
+</ParamField>
+
+<ParamField body="repeticiones" type="string" required>
+  Rep count or instruction, e.g. `"10-12"` or `"Al fallo"`.
+</ParamField>
+
+<ParamField body="descanso_segundos" type="integer" default="60">
+  Rest period between sets in seconds.
+</ParamField>
+
+<ParamField body="notas" type="string">
+  Optional notes for the student about this exercise.
+</ParamField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/detallerutina/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "plan": 7,
+    "ejercicio": 3,
+    "series": 4,
+    "repeticiones": "8-10",
+    "descanso_segundos": 90,
+    "notas": "Mantener espalda recta"
+  }'
+```
+
+```json
+{
+  "id": 12,
+  "plan": 7,
+  "ejercicio": 3,
+  "ejercicio_detalle": {
+    "id": 3,
+    "nombre": "Sentadilla",
+    "grupo_muscular": "Piernas",
+    "descripcion": "Ejercicio compuesto para tren inferior.",
+    "video_url": "https://example.com/videos/sentadilla"
+  },
+  "series": 4,
+  "repeticiones": "8-10",
+  "descanso_segundos": 90,
+  "notas": "Mantener espalda recta"
+}
+```

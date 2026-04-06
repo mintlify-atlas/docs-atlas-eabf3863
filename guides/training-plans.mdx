@@ -1,0 +1,239 @@
+---
+title: "Training plans"
+description: "Create and manage training plans, build exercise catalogs, and assign workouts to students."
+---
+
+Training plans let trainers deliver structured workout programs to students. Plans can be global (visible to all students) or personalized (assigned to a specific student). Each plan can include an attached PDF and an interactive routine built from the exercise catalog.
+
+<Info>
+  Creating trainers and admins share the same permissions for training plan management. Students can only view plans — they cannot create or edit them.
+</Info>
+
+## Trainer workflow
+
+### Step 1: Create an exercise in the catalog
+
+Before building a plan, add the exercises you want to use to the catalog. The catalog is shared across all plans.
+
+<Steps>
+  <Step title="Add an exercise to EjercicioCatalogo">
+
+    ```bash
+    curl -X POST https://your-api-host/api/ejercicios/ \
+      -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "nombre": "Sentadilla con barra",
+        "grupo_muscular": "Cuádriceps",
+        "descripcion": "Sentadilla clásica con barra en los hombros. Mantén la espalda recta y rodillas sobre los pies.",
+        "video_url": "https://www.youtube.com/watch?v=example"
+      }'
+    ```
+
+    <ParamField body="nombre" type="string" required>
+      Exercise name.
+    </ParamField>
+    <ParamField body="grupo_muscular" type="string" required>
+      Muscle group targeted (e.g., `"Cuádriceps"`, `"Pecho"`, `"Espalda"`).
+    </ParamField>
+    <ParamField body="descripcion" type="string">
+      Step-by-step instructions or technique notes.
+    </ParamField>
+    <ParamField body="video_url" type="string">
+      URL to a demonstration video.
+    </ParamField>
+  </Step>
+  <Step title="Note the exercise ID from the response">
+
+    ```json
+    {
+      "id": 7,
+      "nombre": "Sentadilla con barra",
+      "grupo_muscular": "Cuádriceps",
+      "descripcion": "Sentadilla clásica con barra en los hombros. Mantén la espalda recta y rodillas sobre los pies.",
+      "video_url": "https://www.youtube.com/watch?v=example"
+    }
+    ```
+
+    Save the `id` — you will need it when adding this exercise to a plan's routine.
+  </Step>
+</Steps>
+
+### Step 2: Create a training plan
+
+<Tabs>
+  <Tab title="Global plan">
+    A global plan is visible to all students.
+
+    ```bash
+    curl -X POST https://your-api-host/api/planes/ \
+      -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "titulo": "Plan de acondicionamiento general",
+        "es_global": true,
+        "fecha_vencimiento": "2026-07-31"
+      }'
+    ```
+  </Tab>
+  <Tab title="Personalized plan">
+    A personalized plan is assigned to a specific student by their user ID.
+
+    ```bash
+    curl -X POST https://your-api-host/api/planes/ \
+      -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "titulo": "Plan para María González",
+        "es_global": false,
+        "alumno_asignado": 42,
+        "fecha_vencimiento": "2026-06-15"
+      }'
+    ```
+  </Tab>
+  <Tab title="Plan with PDF attachment">
+    Attach a PDF file by sending a multipart form request.
+
+    ```bash
+    curl -X POST https://your-api-host/api/planes/ \
+      -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+      -F "titulo=Plan con rutina imprimible" \
+      -F "es_global=true" \
+      -F "fecha_vencimiento=2026-07-31" \
+      -F "archivo_adjunto=@/path/to/rutina.pdf"
+    ```
+
+    <Note>
+      The `archivo_adjunto` field accepts PDF files. Uploaded files are stored under `planes_pdf/` on the server.
+    </Note>
+  </Tab>
+</Tabs>
+
+<ParamField body="titulo" type="string" required>
+  Display name for the training plan.
+</ParamField>
+<ParamField body="es_global" type="boolean" required>
+  `true` to make the plan visible to all students. `false` for a personalized plan.
+</ParamField>
+<ParamField body="alumno_asignado" type="number">
+  User ID of the student to assign the plan to. Required when `es_global` is `false`.
+</ParamField>
+<ParamField body="fecha_vencimiento" type="string" required>
+  Expiry date in `YYYY-MM-DD` format. The plan is automatically deleted when this date passes.
+</ParamField>
+<ParamField body="archivo_adjunto" type="file">
+  Optional PDF file attachment. Send as multipart form data.
+</ParamField>
+
+The response includes a `creado_por_nombre` field with the trainer's name, and a `rutina_interactiva` array (initially empty).
+
+```json
+{
+  "id": 15,
+  "titulo": "Plan de acondicionamiento general",
+  "es_global": true,
+  "alumno_asignado": null,
+  "archivo_adjunto": null,
+  "fecha_vencimiento": "2026-07-31",
+  "creado_por_nombre": "Carlos Rivas",
+  "rutina_interactiva": []
+}
+```
+
+### Step 3: Add exercises to the plan
+
+Add individual exercises to a plan by creating `DetalleRutina` entries. Each entry links an exercise from the catalog to the plan with specific sets, reps, and rest time.
+
+```bash
+curl -X POST https://your-api-host/api/detallerutina/ \
+  -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "plan": 15,
+    "ejercicio": 7,
+    "series": 4,
+    "repeticiones": "10-12",
+    "descanso_segundos": 90,
+    "notas": "Mantén el pecho arriba y la mirada al frente."
+  }'
+```
+
+<ParamField body="plan" type="number" required>
+  ID of the training plan to attach this exercise to.
+</ParamField>
+<ParamField body="ejercicio" type="number" required>
+  ID of the exercise from the `EjercicioCatalogo`.
+</ParamField>
+<ParamField body="series" type="number" required>
+  Number of sets.
+</ParamField>
+<ParamField body="repeticiones" type="string" required>
+  Rep count or description. Accepts values like `"10-12"`, `"8"`, or `"Al fallo"`.
+</ParamField>
+<ParamField body="descanso_segundos" type="number">
+  Rest time in seconds between sets. Defaults to `60`.
+</ParamField>
+<ParamField body="notas" type="string">
+  Additional technique notes or coaching cues for this exercise.
+</ParamField>
+
+Repeat this step for each exercise you want to include in the plan.
+
+## Plan expiry and auto-deletion
+
+<Warning>
+  When a student or trainer fetches `GET /api/planes/`, the API silently deletes any plans where `fecha_vencimiento` is earlier than today's date. Expired plans are not archived — they are permanently removed.
+</Warning>
+
+Plan accordingly:
+
+- Set `fecha_vencimiento` far enough in advance for the intended training cycle.
+- If a plan needs to be extended, update `fecha_vencimiento` before it expires.
+- Once a plan expires and is deleted, all associated `DetalleRutina` entries are also removed.
+
+## Student workflow: view available plans
+
+Students can retrieve all plans available to them — both global plans and any personalized plans assigned to their account.
+
+```bash
+curl -X GET https://your-api-host/api/planes/ \
+  -H "Authorization: Bearer STUDENT_ACCESS_TOKEN"
+```
+
+```json
+[
+  {
+    "id": 15,
+    "titulo": "Plan de acondicionamiento general",
+    "es_global": true,
+    "alumno_asignado": null,
+    "archivo_adjunto": null,
+    "fecha_vencimiento": "2026-07-31",
+    "creado_por_nombre": "Carlos Rivas",
+    "rutina_interactiva": [
+      {
+        "id": 22,
+        "plan": 15,
+        "ejercicio": 7,
+        "ejercicio_detalle": {
+          "id": 7,
+          "nombre": "Sentadilla con barra",
+          "grupo_muscular": "Cuádriceps",
+          "descripcion": "Sentadilla clásica con barra en los hombros.",
+          "video_url": "https://www.youtube.com/watch?v=example"
+        },
+        "series": 4,
+        "repeticiones": "10-12",
+        "descanso_segundos": 90,
+        "notas": "Mantén el pecho arriba y la mirada al frente."
+      }
+    ]
+  }
+]
+```
+
+<Tip>
+  If a plan includes a PDF attachment, the `archivo_adjunto` field will contain the file URL. Students can download it directly.
+</Tip>
+
+The API automatically filters the results — students only see their own personalized plans and all global plans. Expired plans are removed from the response silently.

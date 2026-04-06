@@ -1,0 +1,235 @@
+---
+title: "User management"
+description: "Register student accounts, view profiles, and manage roles and sports assignments."
+---
+
+This guide covers the full lifecycle of user accounts in the USM Fitness API: registering new students, viewing profiles, and performing admin operations such as searching by RUT and updating roles.
+
+## Register a new student account
+
+Students self-register via `POST /api/usuarios/registro/`. No authentication is required.
+
+<Note>
+  The `username` field must be the student's RUT. It is normalized automatically — see the [RUT normalization rules](#rut-normalization-rules) below.
+</Note>
+
+<Steps>
+  <Step title="Prepare your request body">
+    Provide all required fields. Names and `carrera` are normalized with `.strip().title()` server-side.
+
+    <ParamField body="username" type="string" required>
+      Student RUT used as the username. Normalized to uppercase with dots, spaces, and hyphens removed.
+    </ParamField>
+    <ParamField body="password" type="string" required>
+      Account password. Write-only — never returned in responses.
+    </ParamField>
+    <ParamField body="first_name" type="string" required>
+      Student's first name. Normalized with `.strip().title()`.
+    </ParamField>
+    <ParamField body="last_name" type="string" required>
+      Student's last name. Normalized with `.strip().title()`.
+    </ParamField>
+    <ParamField body="carrera" type="string" required>
+      Student's academic program. Normalized with `.strip().title()`.
+    </ParamField>
+  </Step>
+  <Step title="Send the registration request">
+
+    ```bash
+    curl -X POST https://your-api-host/api/usuarios/registro/ \
+      -H "Content-Type: application/json" \
+      -d '{
+        "username": "12.345.678-9",
+        "password": "securepassword123",
+        "first_name": "María",
+        "last_name": "González",
+        "carrera": "Ingeniería Civil Informática"
+      }'
+    ```
+  </Step>
+  <Step title="Confirm the response">
+    On success, the API returns a confirmation message.
+
+    ```json
+    {
+      "mensaje": "Usuario registrado exitosamente."
+    }
+    ```
+  </Step>
+</Steps>
+
+## RUT normalization rules
+
+The API normalizes the RUT provided in `username` before saving it. You may send the RUT in any common Chilean format — the server will standardize it.
+
+<Info>
+  Normalization removes **dots**, **spaces**, and **hyphens**, then converts the result to **uppercase**.
+</Info>
+
+| Input format | Stored as |
+|---|---|
+| `12.345.678-9` | `123456789` |
+| `12 345 678-9` | `123456789` |
+| `12345678-9` | `123456789` |
+| `12345678k` | `12345678K` |
+
+Send the RUT in any of these formats — the stored value will always be the normalized form.
+
+## View your own profile
+
+Authenticated users can retrieve their own profile and physical assessment data.
+
+```bash
+curl -X GET https://your-api-host/api/usuarios/me/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+The response includes the user record plus a `ficha_fisica` object (or `null` if no assessment has been created yet).
+
+```json
+{
+  "id": 42,
+  "username": "123456789",
+  "first_name": "María",
+  "last_name": "González",
+  "carrera": "Ingeniería Civil Informática",
+  "rol": 1,
+  "es_seleccionado": false,
+  "rama_deportiva": "",
+  "ficha_fisica": null
+}
+```
+
+<ResponseField name="id" type="number">
+  Internal user identifier.
+</ResponseField>
+<ResponseField name="username" type="string">
+  Normalized RUT used as username.
+</ResponseField>
+<ResponseField name="rol" type="number">
+  Role code: `1` = Student, `2` = Trainer, `3` = Admin.
+</ResponseField>
+<ResponseField name="es_seleccionado" type="boolean">
+  Whether the student is designated as a sports-selected athlete.
+</ResponseField>
+<ResponseField name="rama_deportiva" type="string">
+  Sport branch assigned to sports-selected athletes. Empty string if not applicable.
+</ResponseField>
+<ResponseField name="ficha_fisica" type="object | null">
+  Physical assessment card, or `null` if not yet created.
+</ResponseField>
+
+## Admin: search for a user by RUT
+
+Admins can look up any account using the user's RUT via the `rol_usm` query parameter.
+
+<Warning>
+  This endpoint requires the **Admin** role (rol = 3). Requests from students or trainers will be rejected.
+</Warning>
+
+```bash
+curl -X GET "https://your-api-host/api/usuarios/buscar/?rol_usm=123456789" \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+```
+
+Pass the normalized RUT (no dots, hyphens, or spaces) as the `rol_usm` query parameter.
+
+```json
+{
+  "id": 42,
+  "username": "123456789",
+  "first_name": "María",
+  "last_name": "González",
+  "es_seleccionado": false,
+  "rol": 1,
+  "rama_deportiva": "",
+  "carrera": "Ingeniería Civil Informática"
+}
+```
+
+## Admin: promote a user to Trainer or Admin
+
+Use `PATCH /api/usuarios/{id}/actualizar_permisos/` to change a user's role.
+
+<Warning>
+  This endpoint requires the **Admin** role (rol = 3).
+</Warning>
+
+<Tabs>
+  <Tab title="Promote to Trainer">
+    ```bash
+    curl -X PATCH https://your-api-host/api/usuarios/42/actualizar_permisos/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "rol": 2
+      }'
+    ```
+  </Tab>
+  <Tab title="Promote to Admin">
+    ```bash
+    curl -X PATCH https://your-api-host/api/usuarios/42/actualizar_permisos/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "rol": 3
+      }'
+    ```
+  </Tab>
+  <Tab title="Demote to Student">
+    ```bash
+    curl -X PATCH https://your-api-host/api/usuarios/42/actualizar_permisos/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "rol": 1
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+<ParamField body="rol" type="number">
+  New role for the user. `1` = Student, `2` = Trainer, `3` = Admin.
+</ParamField>
+
+## Admin: mark a student as sports-selected
+
+Sports-selected students (`es_seleccionado = true`) receive reservation priority. Assign their sport branch at the same time.
+
+<Steps>
+  <Step title="Mark the student as sports-selected and assign a sport">
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/usuarios/42/actualizar_permisos/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "es_seleccionado": true,
+        "rama_deportiva": "Volleyball"
+      }'
+    ```
+
+    <ParamField body="es_seleccionado" type="boolean" required>
+      Set to `true` to mark the student as sports-selected.
+    </ParamField>
+    <ParamField body="rama_deportiva" type="string">
+      Name of the sport branch (e.g., `"Volleyball"`, `"Basketball"`). Required when `es_seleccionado` is `true`.
+    </ParamField>
+  </Step>
+  <Step title="Remove sports-selected status">
+    Setting `es_seleccionado` to `false` automatically clears `rama_deportiva`.
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/usuarios/42/actualizar_permisos/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "es_seleccionado": false
+      }'
+    ```
+
+    <Note>
+      You do not need to pass `rama_deportiva` when removing sports-selected status — it is cleared automatically.
+    </Note>
+  </Step>
+</Steps>

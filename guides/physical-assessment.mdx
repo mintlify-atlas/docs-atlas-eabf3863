@@ -1,0 +1,170 @@
+---
+title: "Physical assessment"
+description: "Create and manage student physical assessment cards, and add trainer observations."
+---
+
+The physical assessment card (`FichaFisica`) captures a student's physical data at a point in time. Students manage their own cards; trainers and admins can view any student's card and add private observations.
+
+## Student: create your assessment card
+
+Each student has one assessment card. Use `POST /api/fichafisica/` to create it.
+
+<Note>
+  The `usuario` field is set automatically to the authenticated user. You do not need to include it in the request.
+</Note>
+
+<Steps>
+  <Step title="Send the assessment data">
+
+    ```bash
+    curl -X POST https://your-api-host/api/fichafisica/ \
+      -H "Authorization: Bearer STUDENT_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "peso_kg": "74.50",
+        "estatura_cm": "175.00",
+        "lesiones_previas": "Esguince de tobillo derecho (2023). Sin limitaciones actuales.",
+        "objetivo_principal": "Aumentar masa muscular y mejorar resistencia cardiovascular."
+      }'
+    ```
+  </Step>
+  <Step title="Review the response">
+    The API returns the created card with a `fecha_evaluacion` set to today's date.
+
+    ```json
+    {
+      "id": 8,
+      "usuario": 42,
+      "peso_kg": "74.50",
+      "estatura_cm": "175.00",
+      "fecha_evaluacion": "2026-04-06",
+      "lesiones_previas": "Esguince de tobillo derecho (2023). Sin limitaciones actuales.",
+      "objetivo_principal": "Aumentar masa muscular y mejorar resistencia cardiovascular.",
+      "observaciones_entrenador": ""
+    }
+    ```
+  </Step>
+</Steps>
+
+### Fields available to students
+
+<ParamField body="peso_kg" type="string" required>
+  Body weight in kilograms. Accepts decimal values (e.g., `"74.50"`).
+</ParamField>
+<ParamField body="estatura_cm" type="string" required>
+  Height in centimeters. Accepts decimal values (e.g., `"175.00"`).
+</ParamField>
+<ParamField body="lesiones_previas" type="string">
+  Free-text description of previous injuries or conditions. Leave empty if none.
+</ParamField>
+<ParamField body="objetivo_principal" type="string">
+  The student's primary fitness goal.
+</ParamField>
+
+<Warning>
+  The `observaciones_entrenador` field is **read-only for students**. You can see it in the response, but you cannot set or modify it. Only trainers and admins can write to that field.
+</Warning>
+
+## Student: update your assessment card
+
+Use `PATCH /api/fichafisica/{id}/` to update individual fields on your existing card, where `{id}` is the ID returned when you created it.
+
+```bash
+curl -X PATCH https://your-api-host/api/fichafisica/8/ \
+  -H "Authorization: Bearer STUDENT_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peso_kg": "72.80",
+    "objetivo_principal": "Reducir grasa corporal al 15%."
+  }'
+```
+
+Only include the fields you want to change. Other fields remain unchanged.
+
+## Student: view your assessment card
+
+Use `GET /api/fichafisica/` to retrieve your card at any time.
+
+```bash
+curl -X GET https://your-api-host/api/fichafisica/ \
+  -H "Authorization: Bearer STUDENT_ACCESS_TOKEN"
+```
+
+```json
+{
+  "id": 8,
+  "usuario": 42,
+  "peso_kg": "72.80",
+  "estatura_cm": "175.00",
+  "fecha_evaluacion": "2026-04-06",
+  "lesiones_previas": "Esguince de tobillo derecho (2023). Sin limitaciones actuales.",
+  "objetivo_principal": "Reducir grasa corporal al 15%.",
+  "observaciones_entrenador": "Buen progreso. Aumentar carga en press banca."
+}
+```
+
+<Info>
+  The `fecha_evaluacion` is set automatically when the card is first created and does not change on updates.
+</Info>
+
+## Trainer: view any student's assessment
+
+Trainers and admins can look up a student's assessment card using the student's user ID.
+
+<Warning>
+  This endpoint requires the **Trainer** (rol = 2) or **Admin** (rol = 3) role.
+</Warning>
+
+```bash
+curl -X GET "https://your-api-host/api/fichafisica/por_alumno/?alumno_id=42" \
+  -H "Authorization: Bearer TRAINER_ACCESS_TOKEN"
+```
+
+<ParamField query="alumno_id" type="number" required>
+  The user ID of the student whose assessment you want to retrieve.
+</ParamField>
+
+```json
+{
+  "id": 8,
+  "usuario": 42,
+  "peso_kg": "72.80",
+  "estatura_cm": "175.00",
+  "fecha_evaluacion": "2026-04-06",
+  "lesiones_previas": "Esguince de tobillo derecho (2023). Sin limitaciones actuales.",
+  "objetivo_principal": "Reducir grasa corporal al 15%.",
+  "observaciones_entrenador": "Buen progreso. Aumentar carga en press banca."
+}
+```
+
+## Trainer: add or update observations
+
+Use `PATCH /api/fichafisica/{id}/actualizar_nota/` to write trainer observations on a student's card. Pass the assessment card `id` in the URL path.
+
+<Warning>
+  Only **Trainer** and **Admin** roles can call this endpoint. The `observaciones_entrenador` field is read-only for students.
+</Warning>
+
+```bash
+curl -X PATCH https://your-api-host/api/fichafisica/8/actualizar_nota/ \
+  -H "Authorization: Bearer TRAINER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "observaciones_entrenador": "Buen progreso. Aumentar carga en press banca la próxima sesión."
+  }'
+```
+
+<ParamField body="observaciones_entrenador" type="string" required>
+  Trainer's notes or coaching observations for this student. Overwrites the previous value.
+</ParamField>
+
+```json
+{
+  "mensaje": "Observaciones actualizadas con éxito.",
+  "observaciones_entrenador": "Buen progreso. Aumentar carga en press banca la próxima sesión."
+}
+```
+
+<Tip>
+  Students will see the updated `observaciones_entrenador` the next time they fetch their card via `GET /api/fichafisica/`.
+</Tip>

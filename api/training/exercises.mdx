@@ -1,0 +1,204 @@
+---
+title: 'Exercises'
+description: 'Browse and manage the exercise catalog used in training plans.'
+keywords: ['exercises', 'ejercicios', 'catalog', 'muscle group', 'workout']
+---
+
+The exercise catalog (`EjercicioCatalogo`) is a shared library of movements that trainers can draw from when building training plans. All authenticated users can browse the catalog; creating, editing, and deleting exercises requires a Trainer or Admin role.
+
+---
+
+## List exercises
+
+<Warning>
+Requires authentication. All roles (students, trainers, admins) can list exercises.
+</Warning>
+
+```
+GET /api/ejercicios/
+```
+
+### Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique exercise identifier.
+</ResponseField>
+
+<ResponseField name="nombre" type="string" required>
+  Exercise name.
+</ResponseField>
+
+<ResponseField name="grupo_muscular" type="string" required>
+  Target muscle group, e.g. `"Piernas"`, `"Espalda"`, `"Pecho"`.
+</ResponseField>
+
+<ResponseField name="descripcion" type="string">
+  Detailed description of the exercise and proper form. May be `null` if not provided.
+</ResponseField>
+
+<ResponseField name="video_url" type="string">
+  URL to a demonstration video. May be `null` if not provided.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/ejercicios/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Press de banca",
+    "grupo_muscular": "Pecho",
+    "descripcion": "Ejercicio compuesto para el desarrollo del pectoral mayor.",
+    "video_url": "https://example.com/videos/press-banca"
+  },
+  {
+    "id": 2,
+    "nombre": "Dominadas",
+    "grupo_muscular": "Espalda",
+    "descripcion": "Ejercicio de tracción vertical con peso corporal.",
+    "video_url": "https://example.com/videos/dominadas"
+  }
+]
+```
+
+---
+
+## Create an exercise
+
+<Warning>
+Trainer or Admin role required.
+</Warning>
+
+```
+POST /api/ejercicios/
+```
+
+### Request parameters
+
+<ParamField body="nombre" type="string" required>
+  Exercise name.
+</ParamField>
+
+<ParamField body="grupo_muscular" type="string" required>
+  Target muscle group.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Description of the exercise and proper technique. Optional.
+</ParamField>
+
+<ParamField body="video_url" type="string">
+  URL to a demonstration video. Optional.
+</ParamField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/ejercicios/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "nombre": "Sentadilla búlgara",
+    "grupo_muscular": "Piernas",
+    "descripcion": "Sentadilla con pie trasero elevado en banco. Trabaja cuádriceps y glúteos de manera unilateral.",
+    "video_url": "https://example.com/videos/sentadilla-bulgara"
+  }'
+```
+
+```json
+{
+  "id": 15,
+  "nombre": "Sentadilla búlgara",
+  "grupo_muscular": "Piernas",
+  "descripcion": "Sentadilla con pie trasero elevado en banco. Trabaja cuádriceps y glúteos de manera unilateral.",
+  "video_url": "https://example.com/videos/sentadilla-bulgara"
+}
+```
+
+---
+
+## Retrieve an exercise
+
+```
+GET /api/ejercicios/{id}/
+```
+
+<Warning>
+Requires authentication. All roles can retrieve individual exercises.
+</Warning>
+
+Returns the full exercise object.
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/ejercicios/15/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+---
+
+## Update an exercise
+
+<Warning>
+Trainer or Admin role required.
+</Warning>
+
+```
+PUT /api/ejercicios/{id}/
+PATCH /api/ejercicios/{id}/
+```
+
+Use `PUT` to replace all fields or `PATCH` for partial updates. The response returns the full updated exercise object.
+
+### Example — partial update
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/ejercicios/15/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "video_url": "https://example.com/videos/sentadilla-bulgara-v2"
+  }'
+```
+
+```json
+{
+  "id": 15,
+  "nombre": "Sentadilla búlgara",
+  "grupo_muscular": "Piernas",
+  "descripcion": "Sentadilla con pie trasero elevado en banco. Trabaja cuádriceps y glúteos de manera unilateral.",
+  "video_url": "https://example.com/videos/sentadilla-bulgara-v2"
+}
+```
+
+---
+
+## Delete an exercise
+
+<Warning>
+Trainer or Admin role required. Deleting an exercise that is referenced by existing routine items (`DetalleRutina`) will cascade and remove those items as well.
+</Warning>
+
+```
+DELETE /api/ejercicios/{id}/
+```
+
+Returns `204 No Content` on success.
+
+### Example
+
+```bash
+curl --request DELETE \
+  --url https://api.example.com/api/ejercicios/15/ \
+  --header 'Authorization: Bearer <token>'
+```

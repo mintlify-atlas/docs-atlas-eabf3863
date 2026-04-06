@@ -1,0 +1,126 @@
+{
+  "projectType": "api-service",
+  "projectName": "USM Fitness API",
+  "projectDescription": "A Django REST Framework backend for managing gym reservations, training plans, and user attendance at Universidad Santa María.",
+  "theme": "luma",
+  "primaryColor": "#1E3A5F",
+  "lightColor": "#4A90D9",
+  "darkColor": "#0D1F33",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/roles-permissions",
+              "concepts/scheduling",
+              "concepts/reservations",
+              "concepts/penalization-system"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/user-management",
+              "guides/training-plans",
+              "guides/physical-assessment",
+              "guides/gym-configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/login",
+              "api/auth/refresh"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/overview",
+              "api/users/register",
+              "api/users/profile",
+              "api/users/permissions"
+            ]
+          },
+          {
+            "group": "Scheduling & Reservations",
+            "pages": [
+              "api/scheduling/blocks",
+              "api/reservations/overview",
+              "api/reservations/attendance"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "api/training/plans",
+              "api/training/exercises",
+              "api/training/physical-assessment"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "api/admin/configuration",
+              "api/admin/notifications"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication with role-based access control (Student, Trainer, Admin)",
+    "Automated weekly schedule generation for gym time blocks",
+    "Reservation system with capacity control and sports-selected student overflow",
+    "Penalization system: 3 no-shows triggers a 7-day booking block",
+    "Training plan management with interactive workout routines and PDF attachments",
+    "Physical assessment cards (FichaFisica) with trainer observations",
+    "Exercise catalog with muscle group categorization",
+    "Gym open/closed configuration with singleton pattern",
+    "Swagger/OpenAPI interactive documentation at /swagger/"
+  ],
+  "publicApiSurface": [
+    "POST /api/login/ — Obtain JWT access and refresh tokens",
+    "POST /api/login/refresh/ — Refresh access token",
+    "POST /api/usuarios/registro/ — Register a new student",
+    "GET /api/usuarios/me/ — Get current user profile with physical assessment",
+    "GET /api/usuarios/buscar/?rol_usm={rut} — Search user by RUT (Admin only)",
+    "PATCH /api/usuarios/{id}/actualizar_permisos/ — Update user role and sports selection",
+    "GET /api/bloques/ — List available time blocks (auto-generated weekly)",
+    "POST /api/bloques/forzar_generacion/ — Force generate next week's blocks (Admin)",
+    "PATCH /api/bloques/{id}/modificar_bloque/ — Update block trainer or capacity",
+    "GET /api/bloques/{id}/reservas_hoy/ — List reservations for a block (Trainer/Admin)",
+    "GET /api/reservas/ — List reservations (own for students, all for trainers/admins)",
+    "POST /api/reservas/ — Create a reservation",
+    "POST /api/reservas/{id}/cancelar/ — Cancel a pending reservation",
+    "POST /api/reservas/{id}/marcar_asistencia/ — Mark attendance (Trainer/Admin)",
+    "GET /api/fichafisica/ — Get physical assessment card(s)",
+    "PATCH /api/fichafisica/{id}/actualizar_nota/ — Update trainer notes on assessment",
+    "GET /api/fichafisica/por_alumno/?alumno_id={id} — Get assessment by student (Trainer/Admin)",
+    "GET /api/ejercicios/ — List exercise catalog",
+    "POST /api/ejercicios/ — Create exercise (Trainer/Admin)",
+    "GET /api/planes/ — List training plans (own + global for students, all for trainers/admins)",
+    "POST /api/planes/ — Create training plan",
+    "GET /api/detallerutina/ — List workout routine details",
+    "POST /api/detallerutina/ — Add exercise detail to a plan (Trainer/Admin)",
+    "GET /api/configuracion/ — Get gym open/closed status",
+    "PATCH /api/configuracion/ — Update gym configuration (Admin only)"
+  ]
+}

@@ -1,0 +1,261 @@
+---
+title: 'Reservations'
+description: 'Create and manage gym session reservations. Covers listing, creating, and cancelling reservations along with capacity rules and the reservation status lifecycle.'
+keywords: ['reservations', 'reservas', 'booking', 'gym sessions', 'capacity']
+---
+
+<Warning>
+  All endpoints require authentication via a Bearer token.
+</Warning>
+
+## Reservation status lifecycle
+
+Every reservation moves through the following states:
+
+```
+PEN (Pending) ──► PRE (Present)
+                └► AUS (Absent)
+                └► CAN (Cancelled)
+```
+
+| Estado | Meaning   | Set by              |
+|--------|-----------|---------------------|
+| `PEN`  | Pending   | System (on creation)|
+| `PRE`  | Present   | Trainer / Admin     |
+| `AUS`  | Absent    | Trainer / Admin     |
+| `CAN`  | Cancelled | Student (self-cancel)|
+
+<Note>
+  Only `PEN` reservations can be self-cancelled by students. Trainers and admins can correct attendance marks — for example, changing `AUS` to `PRE` for a late arrival.
+</Note>
+
+## Capacity and overflow rules
+
+- Each block has an `aforo_regular` (regular capacity).
+- `cupos_disponibles` = `aforo_regular` − count of `PEN` + `PRE` reservations.
+- When a block is at capacity, only students marked as sports-selected (`es_seleccionado = true`) may still reserve. Their reservation is flagged with `es_sobrecupo = true`.
+- Students who are not sports-selected receive a `400` error when a block is full.
+
+---
+
+## List reservations
+
+Returns reservations filtered by role:
+
+- **Students:** Own reservations only, ordered by `fecha_creacion` descending.
+- **Trainers / Admins:** All reservations in the system.
+
+```
+GET /api/reservas/
+```
+
+### Response fields
+
+<ResponseField name="id" type="integer">
+  Unique reservation identifier.
+</ResponseField>
+
+<ResponseField name="alumno" type="integer">
+  ID of the student who holds the reservation.
+</ResponseField>
+
+<ResponseField name="alumno_nombre" type="string">
+  Display name in the format `"{first_name} {last_name} ({username})"`.
+</ResponseField>
+
+<ResponseField name="bloque" type="integer">
+  ID of the associated time block.
+</ResponseField>
+
+<ResponseField name="bloque_detalle" type="object">
+  Full detail of the associated time block.
+  <Expandable title="bloque_detalle properties">
+    <ResponseField name="id" type="integer">Block ID.</ResponseField>
+    <ResponseField name="fecha" type="string">Date of the block (`YYYY-MM-DD`).</ResponseField>
+    <ResponseField name="dia" type="string">Day code: `LU`, `MA`, `MI`, `JU`, or `VI`.</ResponseField>
+    <ResponseField name="codigo_bloque" type="string">Block slot: `B1` through `B8`.</ResponseField>
+    <ResponseField name="hora_inicio" type="string">Block start time.</ResponseField>
+    <ResponseField name="hora_fin" type="string">Block end time.</ResponseField>
+    <ResponseField name="aforo_regular" type="integer">Maximum regular capacity.</ResponseField>
+    <ResponseField name="entrenador_a_cargo" type="integer">Trainer ID, or `null`.</ResponseField>
+    <ResponseField name="entrenador_nombre" type="string">Trainer full name, or `null`.</ResponseField>
+    <ResponseField name="cupos_disponibles" type="integer">Remaining available spots.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="fecha_especifica" type="string">
+  The specific date for which the reservation applies (`YYYY-MM-DD`).
+</ResponseField>
+
+<ResponseField name="estado" type="string">
+  Current status: `PEN`, `PRE`, `AUS`, or `CAN`.
+</ResponseField>
+
+<ResponseField name="es_sobrecupo" type="boolean">
+  `true` if the student is sports-selected and the block was at capacity at the time of reservation.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/reservas/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 42,
+    "alumno": 7,
+    "alumno_nombre": "María González (mgonzalez)",
+    "bloque": 1,
+    "bloque_detalle": {
+      "id": 1,
+      "fecha": "2026-04-07",
+      "dia": "MA",
+      "codigo_bloque": "B1",
+      "hora_inicio": "08:15",
+      "hora_fin": "09:25",
+      "aforo_regular": 20,
+      "entrenador_a_cargo": 3,
+      "entrenador_nombre": "Carlos Pérez",
+      "cupos_disponibles": 13
+    },
+    "fecha_especifica": "2026-04-07",
+    "estado": "PEN",
+    "es_sobrecupo": false
+  }
+]
+```
+
+---
+
+## Create a reservation
+
+<Note>
+  The `alumno` field is automatically set to the currently authenticated user. Students cannot create reservations on behalf of others.
+</Note>
+
+Creates a new reservation for the authenticated student. The operation runs inside an atomic transaction to prevent race conditions on capacity checks.
+
+```
+POST /api/reservas/
+```
+
+### Request parameters
+
+<ParamField body="bloque" type="integer" required>
+  ID of the time block to reserve.
+</ParamField>
+
+<ParamField body="fecha_especifica" type="string" required>
+  The date for the reservation in `YYYY-MM-DD` format. Must match the block's scheduled date.
+</ParamField>
+
+### Validation rules
+
+The following checks are applied in order before the reservation is created:
+
+1. **Student not blocked** — The student must not have an active `bloqueado_hasta` date in the future. Blocked students cannot reserve.
+2. **One reservation per day** — A student may only have one active (`PEN` or `PRE`) reservation per calendar day.
+3. **Capacity check** — If `cupos_disponibles` is 0, only sports-selected students (`es_seleccionado = true`) can reserve; their reservation is flagged `es_sobrecupo = true`. All other students receive a `400` error.
+
+### Error responses
+
+```json
+{"error": "Estás bloqueado por inasistencias hasta el 2026-04-20."}
+```
+
+```json
+{"error": "Ya tienes una reserva hoy para el Módulo 3. Solo se permite 1 módulo por día."}
+```
+
+```json
+{"error": "Este módulo ya alcanzó su capacidad máxima."}
+```
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "bloque": 1,
+    "fecha_especifica": "2026-04-07"
+  }'
+```
+
+```json
+{
+  "id": 43,
+  "alumno": 7,
+  "alumno_nombre": "María González (mgonzalez)",
+  "bloque": 1,
+  "bloque_detalle": {
+    "id": 1,
+    "fecha": "2026-04-07",
+    "dia": "MA",
+    "codigo_bloque": "B1",
+    "hora_inicio": "08:15",
+    "hora_fin": "09:25",
+    "aforo_regular": 20,
+    "entrenador_a_cargo": 3,
+    "entrenador_nombre": "Carlos Pérez",
+    "cupos_disponibles": 12
+  },
+  "fecha_especifica": "2026-04-07",
+  "estado": "PEN",
+  "es_sobrecupo": false
+}
+```
+
+---
+
+## Cancel a reservation
+
+Cancels the authenticated student's own reservation. The reservation must be in `PEN` estado; attempting to cancel a reservation in any other state returns a `400` error.
+
+```
+POST /api/reservas/{id}/cancelar/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The reservation ID. Students can only cancel their own reservations.
+</ParamField>
+
+<Note>
+  Only `PEN` reservations can be cancelled. Reservations already marked `PRE`, `AUS`, or `CAN` cannot be cancelled through this endpoint.
+</Note>
+
+### Response fields
+
+<ResponseField name="mensaje" type="string">
+  Confirmation string: `"Reserva cancelada."`
+</ResponseField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/43/cancelar/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+{
+  "mensaje": "Reserva cancelada."
+}
+```
+
+### Error response (non-PEN estado)
+
+```json
+{
+  "error": "No se puede cancelar."
+}
+```

@@ -1,0 +1,95 @@
+---
+title: 'Register'
+description: 'Create a new USM Fitness user account. No authentication required.'
+---
+
+Register a new user in the system. This endpoint is open to the public — no token is needed.
+
+<Note>
+  The API normalizes the submitted `username` (RUT) to uppercase with all dots and spaces removed. Submit the RUT in any format; it will be stored consistently. Names are also normalized using title case and trimmed of leading/trailing whitespace.
+</Note>
+
+## Endpoint
+
+```
+POST /api/usuarios/registro/
+```
+
+## Request
+
+### Body parameters
+
+<ParamField body="username" type="string" required>
+  The user's RUT. Dots and spaces are removed and the value is converted to uppercase automatically.
+
+  Example: `12.345.678-K` → stored as `12345678K`
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password. Stored as a hashed value; never returned by the API.
+</ParamField>
+
+<ParamField body="first_name" type="string" required>
+  The user's first name. Normalized to title case and trimmed.
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  The user's last name. Normalized to title case and trimmed.
+</ParamField>
+
+<ParamField body="carrera" type="string" required>
+  The user's academic program or career at USM.
+</ParamField>
+
+## Response
+
+### 201 — Created
+
+<ResponseField name="mensaje" type="string">
+  Confirmation message indicating successful registration.
+</ResponseField>
+
+### 400 — Bad request
+
+Returned when validation fails, for example if the RUT (username) is already registered.
+
+```json
+{
+  "username": ["A user with that username already exists."]
+}
+```
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/usuarios/registro/ \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "username": "12345678K",
+    "password": "securepassword42",
+    "first_name": "María",
+    "last_name": "González",
+    "carrera": "Ingeniería Civil Informática"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 201
+{
+  "mensaje": "Usuario registrado exitosamente."
+}
+```
+
+```json 400
+{
+  "username": ["A user with that username already exists."]
+}
+```
+
+</ResponseExample>

@@ -1,0 +1,279 @@
+---
+title: 'Physical assessment'
+description: 'Create and manage student physical assessment records (FichaFisica).'
+keywords: ['physical assessment', 'ficha fisica', 'peso', 'estatura', 'lesiones', 'health']
+---
+
+A physical assessment (`FichaFisica`) captures each student's baseline health and fitness data. Each student has at most one assessment record (one-to-one with their user account). Trainers and admins can view all assessments and add trainer observations without being able to modify the student's own data.
+
+## Field access by role
+
+| Field | Student | Trainer / Admin |
+|---|---|---|
+| `peso_kg` | Read / write | Read |
+| `estatura_cm` | Read / write | Read |
+| `lesiones_previas` | Read / write | Read |
+| `objetivo_principal` | Read / write | Read |
+| `observaciones_entrenador` | Read-only | Read / write (via `actualizar_nota`) |
+
+<Note>
+`usuario` is automatically set to the authenticated user on creation and is not included in request bodies.
+</Note>
+
+---
+
+## List assessments
+
+```
+GET /api/fichafisica/
+```
+
+<Warning>
+Requires authentication. Students receive only their own record. Trainers and admins receive all records.
+</Warning>
+
+### Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique assessment identifier.
+</ResponseField>
+
+<ResponseField name="usuario" type="integer" required>
+  ID of the student this assessment belongs to.
+</ResponseField>
+
+<ResponseField name="peso_kg" type="string" required>
+  Body weight in kilograms, e.g. `"75.50"`.
+</ResponseField>
+
+<ResponseField name="estatura_cm" type="string" required>
+  Height in centimetres, e.g. `"175.00"`.
+</ResponseField>
+
+<ResponseField name="lesiones_previas" type="string">
+  Description of prior injuries or physical limitations. May be `null` if not provided.
+</ResponseField>
+
+<ResponseField name="objetivo_principal" type="string">
+  Student's primary fitness goal. May be `null` if not provided.
+</ResponseField>
+
+<ResponseField name="observaciones_entrenador" type="string">
+  Trainer observations. Read-only for students; writable only by trainers and admins via the `actualizar_nota` endpoint.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/fichafisica/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 3,
+    "usuario": 42,
+    "peso_kg": "78.50",
+    "estatura_cm": "180.00",
+    "lesiones_previas": "Lesión de rodilla derecha en 2023, ya recuperada.",
+    "objetivo_principal": "Hipertrofia muscular",
+    "observaciones_entrenador": "Evitar carga axial alta en sentadilla por precaución."
+  }
+]
+```
+
+---
+
+## Create an assessment
+
+```
+POST /api/fichafisica/
+```
+
+<Warning>
+Requires authentication. Each student can have only one assessment; attempting to create a second will return a validation error.
+</Warning>
+
+<Note>
+`usuario` is auto-set to the authenticated user. Do not include it in the request body.
+</Note>
+
+### Request parameters
+
+<ParamField body="peso_kg" type="number" required>
+  Body weight in kilograms. Up to 5 digits with 2 decimal places, e.g. `78.50`.
+</ParamField>
+
+<ParamField body="estatura_cm" type="number" required>
+  Height in centimetres. Up to 5 digits with 2 decimal places, e.g. `180.00`.
+</ParamField>
+
+<ParamField body="lesiones_previas" type="string">
+  Description of prior injuries or physical conditions. Optional.
+</ParamField>
+
+<ParamField body="objetivo_principal" type="string">
+  Primary fitness goal. Optional.
+</ParamField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/fichafisica/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "peso_kg": 78.50,
+    "estatura_cm": 180.00,
+    "lesiones_previas": "Lesión de rodilla derecha en 2023, ya recuperada.",
+    "objetivo_principal": "Hipertrofia muscular"
+  }'
+```
+
+```json
+{
+  "id": 3,
+  "usuario": 42,
+  "peso_kg": "78.50",
+  "estatura_cm": "180.00",
+  "lesiones_previas": "Lesión de rodilla derecha en 2023, ya recuperada.",
+  "objetivo_principal": "Hipertrofia muscular",
+  "observaciones_entrenador": ""
+}
+```
+
+---
+
+## Update an assessment
+
+```
+PATCH /api/fichafisica/{id}/
+```
+
+<Warning>
+Students can only update their own assessment. `observaciones_entrenador` is read-only for students; use the `actualizar_nota` action to update it as a trainer.
+</Warning>
+
+### Example
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/fichafisica/3/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "peso_kg": 77.00
+  }'
+```
+
+```json
+{
+  "id": 3,
+  "usuario": 42,
+  "peso_kg": "77.00",
+  "estatura_cm": "180.00",
+  "lesiones_previas": "Lesión de rodilla derecha en 2023, ya recuperada.",
+  "objetivo_principal": "Hipertrofia muscular",
+  "observaciones_entrenador": "Evitar carga axial alta en sentadilla por precaución."
+}
+```
+
+---
+
+## Get assessment by student ID
+
+```
+GET /api/fichafisica/por_alumno/?alumno_id={id}
+```
+
+<Warning>
+Trainer or Admin role required.
+</Warning>
+
+Returns the single `FichaFisica` record for the given student. Returns `404` if the student has not yet completed their assessment.
+
+### Query parameters
+
+<ParamField query="alumno_id" type="integer" required>
+  ID of the student whose assessment you want to retrieve.
+</ParamField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url 'https://api.example.com/api/fichafisica/por_alumno/?alumno_id=42' \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+{
+  "id": 3,
+  "usuario": 42,
+  "peso_kg": "77.00",
+  "estatura_cm": "180.00",
+  "lesiones_previas": "Lesión de rodilla derecha en 2023, ya recuperada.",
+  "objetivo_principal": "Hipertrofia muscular",
+  "observaciones_entrenador": "Evitar carga axial alta en sentadilla por precaución."
+}
+```
+
+**Error — student has no assessment:**
+
+```json
+{
+  "error": "Este alumno aún no ha completado su Ficha Física."
+}
+```
+
+---
+
+## Add trainer observations
+
+```
+PATCH /api/fichafisica/{id}/actualizar_nota/
+```
+
+<Warning>
+Trainer or Admin role required. Students cannot call this endpoint.
+</Warning>
+
+Updates only the `observaciones_entrenador` field. The student's own data (`peso_kg`, `estatura_cm`, etc.) is not affected.
+
+### Request parameters
+
+<ParamField body="observaciones_entrenador" type="string" required>
+  Trainer's observations and recommendations for this student.
+</ParamField>
+
+### Response fields
+
+<ResponseField name="mensaje" type="string">
+  Confirmation message: `"Observaciones actualizadas con éxito."`.
+</ResponseField>
+
+<ResponseField name="observaciones_entrenador" type="string">
+  The updated observations text.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/fichafisica/3/actualizar_nota/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "observaciones_entrenador": "Excelente progreso. Aumentar carga en press de banca la próxima semana."
+  }'
+```
+
+```json
+{
+  "mensaje": "Observaciones actualizadas con éxito.",
+  "observaciones_entrenador": "Excelente progreso. Aumentar carga en press de banca la próxima semana."
+}
+```

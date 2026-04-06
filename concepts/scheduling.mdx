@@ -1,0 +1,92 @@
+---
+title: "Scheduling"
+description: "How the USM Fitness API organizes gym time into standard weekly blocks and auto-generates the schedule on access."
+keywords: ["schedule", "time blocks", "BloqueHorario", "aforo", "trainer", "auto-generation"]
+---
+
+The gym operates on a fixed weekly structure of eight time blocks from Monday through Friday. The API represents each slot as a `BloqueHorario` (time block) object that ties a day, a date, a trainer, and a capacity together.
+
+## Standard time blocks
+
+Each block has a code (`B1`–`B8`) and a fixed start and end time. These times are the same every day of the week.
+
+| Code | Start | End |
+|---|---|---|
+| B1 | 08:15 | 09:25 |
+| B2 | 09:40 | 10:50 |
+| B3 | 11:05 | 12:15 |
+| B4 | 12:30 | 13:40 |
+| B5 | 14:40 | 15:50 |
+| B6 | 16:05 | 17:15 |
+| B7 | 17:30 | 18:40 |
+| B8 | 18:50 | 20:00 |
+
+<Note>
+  The gym operates Monday through Friday only. Weekend days (`SA`, `DO`) are not scheduled, and no blocks are generated for them.
+</Note>
+
+## Days of the week
+
+The `BloqueHorario` model uses short codes for weekdays:
+
+```python gimnasio/models.py
+DIAS_SEMANA = [
+    ("LU", "Lunes"),
+    ("MA", "Martes"),
+    ("MI", "Miércoles"),
+    ("JU", "Jueves"),
+    ("VI", "Viernes"),
+]
+```
+
+## Capacity (`aforo_regular`)
+
+Every block has an `aforo_regular` field that sets the maximum number of regular (non-overflow) reservations allowed. The default is **20 students**.
+
+When a reservation request arrives and the active reservation count equals `aforo_regular`, the system blocks the booking for regular students. Sports-selected athletes (`es_seleccionado = True`) may still book, and their reservation is flagged as `es_sobrecupo = True`. See [Reservations](/concepts/reservations) for the full capacity control logic.
+
+Administrators can set a different `aforo_regular` per block when creating or editing blocks via `POST /api/bloques/`.
+
+## Trainer assignment
+
+Each `BloqueHorario` has an `entrenador_a_cargo` foreign key pointing to a `Usuario` with `rol == 2` (Trainer). The trainer assigned to a block is responsible for marking attendance for that session.
+
+```python gimnasio/models.py
+entrenador_a_cargo: ForeignKey(Usuario, rol=2)
+```
+
+## Auto-generation
+
+The weekly schedule is generated automatically — you do not need to create blocks manually each week. Generation is triggered the first time blocks are accessed for a given week.
+
+<Steps>
+  <Step title="Access trigger">
+    Any request to `GET /api/bloques/` triggers the auto-generation logic if the current week's blocks do not yet exist.
+  </Step>
+  <Step title="Weekday vs. weekend behavior">
+    - **On a weekday (Mon–Fri):** the system generates blocks for the current week.
+    - **On a weekend (Sat–Sun):** the system generates blocks for the following Monday's week instead.
+  </Step>
+  <Step title="Copying trainer and capacity">
+    For each new block, the system looks up the most recent block with the same `dia` and `codigo_bloque`. If one is found, it copies the `entrenador_a_cargo` and `aforo_regular` values so the schedule stays consistent week to week.
+  </Step>
+  <Step title="Auto-closing past pending reservations">
+    After generating blocks, the system scans all past blocks that still have reservations in `PEN` (Pending) status and automatically marks them as `AUS` (Absent). This ensures no reservation stays pending after a session has ended.
+  </Step>
+</Steps>
+
+<Warning>
+  Auto-closing past pending reservations triggers the penalization signal. Students who had a pending reservation on a past block will receive an absence count. See [Penalization system](/concepts/penalization-system).
+</Warning>
+
+## BloqueHorario fields
+
+| Field | Type | Description |
+|---|---|---|
+| `dia` | `CharField` | Day code: `LU`, `MA`, `MI`, `JU`, `VI` |
+| `fecha` | `DateField` | Specific calendar date of the block |
+| `codigo_bloque` | `CharField` | Block code: `B1`–`B8` |
+| `hora_inicio` | `TimeField` | Start time |
+| `hora_fin` | `TimeField` | End time |
+| `aforo_regular` | `PositiveIntegerField` | Max regular reservations (default 20) |
+| `entrenador_a_cargo` | `ForeignKey` | Trainer responsible for the session |

@@ -1,0 +1,76 @@
+---
+title: 'Notifications'
+description: 'Overview of the Notificacion data model and how notifications are managed.'
+keywords: ['notifications', 'notificaciones', 'django admin', 'in-app notifications']
+---
+
+Notifications (`Notificacion`) are stored in the database and associated with individual users. They record in-app alerts such as plan assignments, assessment updates, or gym announcements.
+
+<Warning>
+There are no public REST API endpoints for notifications. Notifications are managed exclusively through the Django admin panel at `/admin/`. This page documents the data model for developers building integrations or custom interfaces on top of the system.
+</Warning>
+
+---
+
+## Data model
+
+The `Notificacion` model has the following fields:
+
+<ResponseField name="id" type="integer">
+  Auto-generated primary key.
+</ResponseField>
+
+<ResponseField name="usuario" type="integer">
+  ID of the user this notification belongs to. Foreign key to `Usuario`.
+</ResponseField>
+
+<ResponseField name="titulo" type="string">
+  Short notification title, e.g. `"Nuevo plan asignado"`.
+</ResponseField>
+
+<ResponseField name="mensaje" type="string">
+  Full notification body text.
+</ResponseField>
+
+<ResponseField name="fecha_creacion" type="string">
+  ISO 8601 datetime set automatically when the notification is created. Not editable after creation.
+</ResponseField>
+
+<ResponseField name="leida" type="boolean">
+  `false` when the notification is new; `true` once the user has read it. Defaults to `false`.
+</ResponseField>
+
+---
+
+## Managing notifications via Django admin
+
+All notification operations — creating, viewing, marking as read, and deleting — are performed through the Django admin interface.
+
+<Steps>
+  <Step title="Open the admin panel">
+    Navigate to `/admin/` on your deployment and log in with a superuser account.
+  </Step>
+  <Step title="Locate the Notifications section">
+    Under the app group in the left sidebar, click **Notificaciones**.
+  </Step>
+  <Step title="Create a notification">
+    Click **Add notification**, fill in `usuario`, `titulo`, and `mensaje`, then save. `fecha_creacion` is set automatically and `leida` defaults to `false`.
+  </Step>
+  <Step title="Mark notifications as read">
+    Select one or more notification records and use the **Mark as read** bulk action, or open an individual record and set `leida` to `true`.
+  </Step>
+</Steps>
+
+---
+
+## Developer notes
+
+If you need to surface notifications in a custom frontend or mobile app, consider the following approaches:
+
+- **Django REST Framework endpoint:** Create a dedicated `NotificacionViewSet` and register it in `urls.py`. You can filter by `usuario` and `leida` to support unread badge counts and notification lists.
+- **WebSocket push:** Use Django Channels to emit notification events in real time when a `Notificacion` record is created.
+- **Polling:** Query a custom list endpoint on a short interval to check for new notifications per authenticated user.
+
+<Note>
+Because `fecha_creacion` uses `auto_now_add`, it is set at insert time and cannot be modified. Use this field to sort notifications chronologically in any future endpoint implementation.
+</Note>

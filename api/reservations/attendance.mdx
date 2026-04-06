@@ -1,0 +1,131 @@
+---
+title: 'Attendance'
+description: 'Mark and correct attendance for gym session reservations. Trainers and admins can record presence, absence, or revert a mark for late arrivals.'
+keywords: ['attendance', 'asistencia', 'mark present', 'mark absent', 'reservations']
+---
+
+<Warning>
+  This endpoint requires a **Trainer** or **Admin** role.
+</Warning>
+
+## Mark attendance
+
+Records or corrects the attendance state of a reservation. This endpoint is used during or after a session to indicate whether a student was present or absent.
+
+```
+POST /api/reservas/{id}/marcar_asistencia/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The reservation ID.
+</ParamField>
+
+### Request parameters
+
+<ParamField body="estado" type="string" required>
+  The new attendance estado. Accepted values:
+
+  - `PRE` — Student was present.
+  - `AUS` — Student was absent.
+  - `PEN` — Revert to pending (e.g., to correct a premature mark).
+</ParamField>
+
+### Response fields
+
+<ResponseField name="mensaje" type="string">
+  Confirmation string: `"Asistencia registrada"`.
+</ResponseField>
+
+<ResponseField name="estado_actual" type="string">
+  The estado that was applied. Reflects the value sent in the request body.
+</ResponseField>
+
+### Business rules
+
+<Note>
+  Trainers can correct attendance marks at any time. For example, if a student was initially marked `AUS` but arrived late, a trainer can call this endpoint with `estado: PRE` to update the record.
+</Note>
+
+<Warning>
+  When a student is marked `AUS`, a penalization signal is triggered automatically by the system. Depending on the student's absence history, this may result in the student being blocked (`bloqueado_hasta`) from making future reservations. This signal fires server-side and requires no additional action from the caller.
+</Warning>
+
+### Examples
+
+**Mark a student as present:**
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/42/marcar_asistencia/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "estado": "PRE"
+  }'
+```
+
+```json
+{
+  "mensaje": "Asistencia registrada",
+  "estado_actual": "PRE"
+}
+```
+
+**Mark a student as absent:**
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/42/marcar_asistencia/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "estado": "AUS"
+  }'
+```
+
+```json
+{
+  "mensaje": "Asistencia registrada",
+  "estado_actual": "AUS"
+}
+```
+
+**Correct an absent mark for a late arrival:**
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/42/marcar_asistencia/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "estado": "PRE"
+  }'
+```
+
+```json
+{
+  "mensaje": "Asistencia registrada",
+  "estado_actual": "PRE"
+}
+```
+
+**Revert a mark back to pending:**
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/reservas/42/marcar_asistencia/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "estado": "PEN"
+  }'
+```
+
+```json
+{
+  "mensaje": "Asistencia registrada",
+  "estado_actual": "PEN"
+}
+```

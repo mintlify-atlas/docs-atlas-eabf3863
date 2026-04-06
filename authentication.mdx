@@ -1,0 +1,222 @@
+---
+title: "Authentication"
+description: "Authenticate with JWT tokens and understand role-based access."
+---
+
+The USM Fitness API uses JSON Web Tokens (JWT) for authentication. Every protected endpoint requires a valid access token passed in the `Authorization` request header.
+
+## Get tokens
+
+Send a `POST` request to `/api/login/` with your RUT as the username and your password.
+
+<Tabs>
+  <Tab title="curl">
+    ```bash
+    curl --request POST \
+      --url http://localhost:8000/api/login/ \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "username": "20.123.456-7",
+        "password": "MySecurePass123"
+      }'
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import requests
+
+    response = requests.post(
+        "http://localhost:8000/api/login/",
+        json={
+            "username": "20.123.456-7",
+            "password": "MySecurePass123",
+        },
+    )
+    tokens = response.json()
+    access_token = tokens["access"]
+    refresh_token = tokens["refresh"]
+    ```
+  </Tab>
+</Tabs>
+
+**Response:**
+
+```json
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+<Note>
+  The `username` field is your RUT in Chilean format (e.g. `20.123.456-7`). You set this when registering at `/api/usuarios/registro/`.
+</Note>
+
+## Token lifetimes
+
+| Token   | Lifetime | Use                                           |
+| ------- | -------- | --------------------------------------------- |
+| Access  | 1 day    | Authenticate requests to protected endpoints  |
+| Refresh | 7 days   | Obtain a new access token after it expires    |
+
+<Warning>
+  Store tokens securely. Do not expose them in client-side code, URLs, or logs. If your access token expires, use the refresh token to obtain a new one — do not ask the user to log in again.
+</Warning>
+
+## Pass the token in requests
+
+Include the access token in the `Authorization` header of every request to a protected endpoint.
+
+<Tabs>
+  <Tab title="curl">
+    ```bash
+    curl --request GET \
+      --url http://localhost:8000/api/usuarios/me/ \
+      --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import requests
+
+    access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    response = requests.get(
+        "http://localhost:8000/api/usuarios/me/",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    print(response.json())
+    ```
+  </Tab>
+</Tabs>
+
+The header format is always:
+
+```
+Authorization: Bearer <access_token>
+```
+
+## Refresh an expired access token
+
+When your access token expires, use the refresh token to get a new one without requiring the user to log in again.
+
+<Tabs>
+  <Tab title="curl">
+    ```bash
+    curl --request POST \
+      --url http://localhost:8000/api/login/refresh/ \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      }'
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```python
+    import requests
+
+    refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    response = requests.post(
+        "http://localhost:8000/api/login/refresh/",
+        json={"refresh": refresh_token},
+    )
+    new_access_token = response.json()["access"]
+    ```
+  </Tab>
+</Tabs>
+
+**Response:**
+
+```json
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+<Warning>
+  If the refresh token itself has expired (after 7 days), the user must log in again via `POST /api/login/`. There is no way to silently re-authenticate once both tokens are expired.
+</Warning>
+
+## Common error responses
+
+| Status | Meaning                                                                                      |
+| ------ | -------------------------------------------------------------------------------------------- |
+| `401`  | Missing or invalid token. Include a valid `Authorization: Bearer <token>` header.           |
+| `403`  | Valid token, but your role does not have permission to access this resource.                 |
+
+**401 example — missing token:**
+
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+**401 example — expired or invalid token:**
+
+```json
+{
+  "detail": "Given token not valid for any token type",
+  "code": "token_not_valid"
+}
+```
+
+**403 example — insufficient role:**
+
+```json
+{
+  "detail": "You do not have permission to perform this action."
+}
+```
+
+## Role-based access
+
+Every user account has a role level that controls what they can read and modify.
+
+<Note>
+  Role levels are assigned during registration or updated by an administrator. Most endpoints check your role before processing the request.
+</Note>
+
+| Role           | Level | Access                                                                                    |
+| -------------- | ----- | ----------------------------------------------------------------------------------------- |
+| Alumno         | 1     | View and book gym blocks, view their own training plan and physical assessment            |
+| Entrenador     | 2     | All Alumno access, plus mark attendance, create training plans, and manage assessments    |
+| Administrador  | 3     | Full access including gym configuration, user management, and notification management     |
+
+<Note>
+  A user with role level 3 (Administrador) can access any endpoint. Role checks are enforced server-side — passing a modified token will not grant elevated privileges.
+</Note>
+
+### What each role can do
+
+<AccordionGroup>
+  <Accordion title="Alumno (level 1)">
+    - Register and manage their own profile
+    - View upcoming gym blocks and available capacity (`GET /api/bloques/`)
+    - Create, view, and cancel their own reservations
+    - View their assigned training plan
+    - View their physical assessment card
+  </Accordion>
+  <Accordion title="Entrenador (level 2)">
+    - Everything an Alumno can do
+    - Mark student attendance after a session
+    - Create and assign global or personalized training plans
+    - Record and update physical assessments for students
+  </Accordion>
+  <Accordion title="Administrador (level 3)">
+    - Everything an Entrenador can do
+    - Configure gym capacity, schedules, and settings
+    - Manage user accounts and role assignments
+    - Send and manage notifications
+    - Access all administrative endpoints
+  </Accordion>
+</AccordionGroup>
+
+## Interactive API explorer
+
+The USM Fitness backend ships with a Swagger UI for exploring endpoints directly in the browser. Access it at `/swagger/` on any running instance.
+
+<Tip>
+  Click **Authorize** in the Swagger UI and enter `Bearer <your_access_token>` to authenticate all requests from the browser.
+</Tip>

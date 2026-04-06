@@ -1,0 +1,75 @@
+---
+title: 'Refresh token'
+description: 'Exchange a valid refresh token for a new JWT access token.'
+---
+
+Use this endpoint to obtain a new access token once the previous one has expired. The refresh token itself remains valid for 7 days from the time of login. No authentication header is required.
+
+<Warning>
+  If the refresh token is expired or invalid, the user must log in again via [POST /api/login/](/api/auth/login).
+</Warning>
+
+## Endpoint
+
+```
+POST /api/login/refresh/
+```
+
+## Request
+
+### Body parameters
+
+<ParamField body="refresh" type="string" required>
+  The refresh token previously received from [POST /api/login/](/api/auth/login). Valid for 7 days.
+</ParamField>
+
+## Response
+
+### 200 — Success
+
+<ResponseField name="access" type="string" required>
+  A new signed JWT access token. Valid for **1 day**. Use this in the `Authorization: Bearer <token>` header for subsequent requests.
+</ResponseField>
+
+### 401 — Unauthorized
+
+Returned when the refresh token is invalid, malformed, or expired.
+
+```json
+{
+  "detail": "Token is invalid or expired",
+  "code": "token_not_valid"
+}
+```
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/login/refresh/ \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTcxNDYwMDAwMCwidXNlcm5hbWUiOiIxMjM0NTY3OEsifQ.xyz789"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzE0MDg2NDAwLCJ1c2VybmFtZSI6IjEyMzQ1Njc4SyJ9.newtoken456"
+}
+```
+
+```json 401
+{
+  "detail": "Token is invalid or expired",
+  "code": "token_not_valid"
+}
+```
+
+</ResponseExample>

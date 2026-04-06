@@ -1,0 +1,53 @@
+---
+title: 'Users overview'
+description: 'Overview of the USM Fitness user management endpoints, roles, and conventions.'
+---
+
+The users API handles registration, profile retrieval, and permission management for USM Fitness members, trainers, and administrators.
+
+## Username convention
+
+<Note>
+  Usernames in this API represent a user's **RUT** (Chilean national ID). During registration the API normalizes the value to uppercase with all dots and spaces removed. Always submit the RUT in this format when authenticating or searching for a user.
+
+  Example: `12.345.678-K` → `12345678K`
+</Note>
+
+## Role values
+
+| Value | Role    | Description                                         |
+| ----- | ------- | --------------------------------------------------- |
+| `1`   | Student | Standard gym member. Can view their own profile.    |
+| `2`   | Trainer | Can manage training data for assigned members.      |
+| `3`   | Admin   | Full access. Can search users and update permissions. |
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Register" icon="user-plus" href="/api/users/register">
+    Create a new user account. No authentication required.
+  </Card>
+  <Card title="Profile" icon="circle-user" href="/api/users/profile">
+    Retrieve the authenticated user's profile and physical assessment.
+  </Card>
+  <Card title="Permissions" icon="shield-check" href="/api/users/permissions">
+    Update a user's role, selection status, and sport branch. Admin only.
+  </Card>
+</CardGroup>
+
+## Quick reference
+
+| Method | Endpoint                                  | Auth required       | Description                          |
+| ------ | ----------------------------------------- | ------------------- | ------------------------------------ |
+| POST   | `/api/usuarios/registro/`                 | None                | Register a new user                  |
+| GET    | `/api/usuarios/me/`                       | Bearer token        | Get the current user's profile       |
+| GET    | `/api/usuarios/buscar/?rol_usm={rut}`     | Admin (rol == 3)    | Look up a user by RUT                |
+| PATCH  | `/api/usuarios/{id}/actualizar_permisos/` | Admin (rol == 3)    | Update a user's role and permissions |
+
+## Authentication
+
+All authenticated endpoints require a `Bearer` token in the `Authorization` header. Obtain a token from [POST /api/login/](/api/auth/login).
+
+```bash
+Authorization: Bearer <access_token>
+```

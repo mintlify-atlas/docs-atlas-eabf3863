@@ -1,0 +1,399 @@
+---
+title: 'Time blocks'
+description: 'Manage scheduled time blocks (BloqueHorario) for gym sessions. Includes auto-generation, trainer assignment, and per-block reservation views.'
+keywords: ['time blocks', 'scheduling', 'bloques horarios', 'gym sessions']
+---
+
+<Warning>
+  All endpoints require authentication via a Bearer token. Admin-only and Trainer/Admin-only endpoints are noted per endpoint.
+</Warning>
+
+## Standard block schedule
+
+The system operates with 8 fixed time blocks (BLOQUES_ESTANDAR) Monday through Friday (LU, MA, MI, JU, VI).
+
+| Code | Start | End   |
+|------|-------|-------|
+| B1   | 08:15 | 09:25 |
+| B2   | 09:40 | 10:50 |
+| B3   | 11:05 | 12:15 |
+| B4   | 12:30 | 13:40 |
+| B5   | 14:40 | 15:50 |
+| B6   | 16:05 | 17:15 |
+| B7   | 17:30 | 18:40 |
+| B8   | 18:50 | 20:00 |
+
+<Note>
+  `hora_inicio` and `hora_fin` are read-only and derived from the block's `codigo_bloque`. They cannot be set manually.
+</Note>
+
+## Auto-generation
+
+Blocks for the current week are generated automatically the first time any authenticated user calls `GET /api/bloques/` and no blocks exist for that week. There is no need to manually trigger generation for normal operation.
+
+---
+
+## List time blocks
+
+<Warning>Requires authentication.</Warning>
+
+Returns time blocks. Response content varies by role:
+
+- **Students:** Only future and current blocks, ordered by `fecha` then `hora_inicio` (ascending).
+- **Trainers / Admins:** All blocks, ordered by `fecha` descending, then `hora_inicio` ascending.
+
+```
+GET /api/bloques/
+```
+
+### Response fields
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the block.
+</ResponseField>
+
+<ResponseField name="fecha" type="string">
+  Date of the block in `YYYY-MM-DD` format.
+</ResponseField>
+
+<ResponseField name="dia" type="string">
+  Day code. One of `LU`, `MA`, `MI`, `JU`, `VI`.
+</ResponseField>
+
+<ResponseField name="codigo_bloque" type="string">
+  Block code. One of `B1` through `B8`.
+</ResponseField>
+
+<ResponseField name="hora_inicio" type="string">
+  Block start time (read-only, derived from `codigo_bloque`).
+</ResponseField>
+
+<ResponseField name="hora_fin" type="string">
+  Block end time (read-only, derived from `codigo_bloque`).
+</ResponseField>
+
+<ResponseField name="aforo_regular" type="integer">
+  Maximum regular capacity for the block.
+</ResponseField>
+
+<ResponseField name="entrenador_a_cargo" type="integer">
+  ID of the trainer assigned to this block. May be `null`.
+</ResponseField>
+
+<ResponseField name="entrenador_nombre" type="string">
+  Full name of the assigned trainer. `null` if no trainer is assigned.
+</ResponseField>
+
+<ResponseField name="cupos_disponibles" type="integer">
+  Computed available spots: `aforo_regular` minus the count of active reservations with estado `PEN` or `PRE`.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/bloques/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 1,
+    "fecha": "2026-04-07",
+    "dia": "MA",
+    "codigo_bloque": "B1",
+    "hora_inicio": "08:15",
+    "hora_fin": "09:25",
+    "aforo_regular": 20,
+    "entrenador_a_cargo": 3,
+    "entrenador_nombre": "Carlos Pérez",
+    "cupos_disponibles": 14
+  }
+]
+```
+
+---
+
+## Create a time block
+
+<Warning>Requires Admin role.</Warning>
+
+Creates a new time block. `hora_inicio` and `hora_fin` are set automatically based on `codigo_bloque`.
+
+```
+POST /api/bloques/
+```
+
+### Request parameters
+
+<ParamField body="fecha" type="string" required>
+  Date for the block in `YYYY-MM-DD` format. Must be today or a future date.
+</ParamField>
+
+<ParamField body="dia" type="string" required>
+  Day code. One of `LU`, `MA`, `MI`, `JU`, `VI`.
+</ParamField>
+
+<ParamField body="codigo_bloque" type="string" required>
+  Block slot. One of `B1` through `B8`.
+</ParamField>
+
+<ParamField body="aforo_regular" type="integer" required>
+  Maximum number of students for regular enrollment.
+</ParamField>
+
+<ParamField body="entrenador_a_cargo" type="integer">
+  ID of the trainer to assign. Optional.
+</ParamField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/bloques/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "fecha": "2026-04-08",
+    "dia": "MI",
+    "codigo_bloque": "B3",
+    "aforo_regular": 20,
+    "entrenador_a_cargo": 3
+  }'
+```
+
+---
+
+## Retrieve a time block
+
+<Warning>Requires authentication.</Warning>
+
+Returns the full detail of a single time block.
+
+```
+GET /api/bloques/{id}/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The block ID.
+</ParamField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/bloques/1/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+---
+
+## Update a time block
+
+<Warning>Requires Admin role.</Warning>
+
+Replaces (`PUT`) or partially updates (`PATCH`) a time block. `hora_inicio` and `hora_fin` remain read-only.
+
+```
+PUT /api/bloques/{id}/
+PATCH /api/bloques/{id}/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The block ID.
+</ParamField>
+
+### Example
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/bloques/1/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "aforo_regular": 25
+  }'
+```
+
+---
+
+## Delete a time block
+
+<Warning>Requires Admin role.</Warning>
+
+Permanently removes a time block.
+
+```
+DELETE /api/bloques/{id}/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The block ID.
+</ParamField>
+
+### Example
+
+```bash
+curl --request DELETE \
+  --url https://api.example.com/api/bloques/1/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+---
+
+## Force generate next week's blocks
+
+<Warning>Requires Admin role.</Warning>
+
+Manually triggers generation of all standard blocks for the upcoming week. Useful for administrative previews or corrections before the automatic trigger fires.
+
+<Note>
+  For normal operation, block generation happens automatically on `GET /api/bloques/`. This endpoint is only needed if you want to force generation ahead of time.
+</Note>
+
+```
+POST /api/bloques/forzar_generacion/
+```
+
+### Response fields
+
+<ResponseField name="mensaje" type="string">
+  Confirmation message including the week start date. Example: `"Semana del 2026-04-13 generada con éxito."`
+</ResponseField>
+
+### Example
+
+```bash
+curl --request POST \
+  --url https://api.example.com/api/bloques/forzar_generacion/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+{
+  "mensaje": "Semana del 2026-04-13 generada con éxito."
+}
+```
+
+---
+
+## Modify a block (trainer or admin)
+
+<Warning>Requires authentication. Only trainers and admins can make meaningful changes; other roles are rejected by business logic.</Warning>
+
+Updates the assigned trainer or the capacity of a specific block without replacing the full record.
+
+```
+PATCH /api/bloques/{id}/modificar_bloque/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The block ID.
+</ParamField>
+
+### Request parameters
+
+<ParamField body="entrenador_a_cargo" type="integer">
+  ID of the trainer to assign, or `null` to remove the assignment.
+</ParamField>
+
+<ParamField body="aforo_regular" type="integer">
+  New capacity for the block.
+</ParamField>
+
+### Response fields
+
+Returns the full updated block object. See [List time blocks](#list-time-blocks) for field descriptions.
+
+### Example
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/bloques/1/modificar_bloque/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "entrenador_a_cargo": 5,
+    "aforo_regular": 18
+  }'
+```
+
+```json
+{
+  "id": 1,
+  "fecha": "2026-04-07",
+  "dia": "MA",
+  "codigo_bloque": "B1",
+  "hora_inicio": "08:15",
+  "hora_fin": "09:25",
+  "aforo_regular": 18,
+  "entrenador_a_cargo": 5,
+  "entrenador_nombre": "Ana Torres",
+  "cupos_disponibles": 12
+}
+```
+
+---
+
+## List reservations for a block (today)
+
+<Warning>Requires Trainer or Admin role.</Warning>
+
+Returns all non-cancelled reservations for a given block. Intended for trainers to review attendance before or during a session.
+
+```
+GET /api/bloques/{id}/reservas_hoy/
+```
+
+### Path parameters
+
+<ParamField path="id" type="integer" required>
+  The block ID.
+</ParamField>
+
+<Note>
+  Only reservations with estado `PEN`, `PRE`, or `AUS` are returned. Cancelled (`CAN`) reservations are excluded.
+</Note>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/bloques/1/reservas_hoy/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+[
+  {
+    "id": 42,
+    "alumno": 7,
+    "alumno_nombre": "María González (mgonzalez)",
+    "bloque": 1,
+    "bloque_detalle": {
+      "id": 1,
+      "fecha": "2026-04-07",
+      "dia": "MA",
+      "codigo_bloque": "B1",
+      "hora_inicio": "08:15",
+      "hora_fin": "09:25",
+      "aforo_regular": 20,
+      "entrenador_a_cargo": 3,
+      "entrenador_nombre": "Carlos Pérez",
+      "cupos_disponibles": 14
+    },
+    "fecha_especifica": "2026-04-07",
+    "estado": "PEN",
+    "es_sobrecupo": false
+  }
+]
+```

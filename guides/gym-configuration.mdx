@@ -1,0 +1,152 @@
+---
+title: "Gym configuration"
+description: "Control gym open/closed status and the message shown to users during closures."
+---
+
+The gym configuration (`ConfiguracionGimnasio`) is a singleton — there is exactly one configuration record for the entire system. It controls whether the gym is open for reservations and what message students see when it is closed.
+
+<Info>
+  Any authenticated user can read the current configuration. Only **Admin** users (rol = 3) can modify it.
+</Info>
+
+## What the configuration controls
+
+<CardGroup cols={2}>
+  <Card title="Open/closed status" icon="door-open">
+    The `gimnasio_abierto` flag determines whether students can make reservations. When set to `false`, the gym is considered closed.
+  </Card>
+  <Card title="Closure message" icon="message">
+    The `mensaje_cierre` field holds the text displayed to users when the gym is closed. Use it to explain the reason for closure.
+  </Card>
+</CardGroup>
+
+## Check current gym status
+
+Any authenticated user can fetch the current configuration.
+
+```bash
+curl -X GET https://your-api-host/api/configuracion/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```json
+{
+  "gimnasio_abierto": true,
+  "mensaje_cierre": "El gimnasio se encuentra cerrado por receso universitario o mantención."
+}
+```
+
+<ResponseField name="gimnasio_abierto" type="boolean">
+  `true` if the gym is open and accepting reservations. `false` if the gym is closed.
+</ResponseField>
+<ResponseField name="mensaje_cierre" type="string">
+  The message shown to students when `gimnasio_abierto` is `false`. The default message is: `"El gimnasio se encuentra cerrado por receso universitario o mantención."`
+</ResponseField>
+
+## Admin: close the gym
+
+Use `PATCH /api/configuracion/` to update the configuration.
+
+<Warning>
+  This endpoint requires the **Admin** role (rol = 3). Requests from students or trainers will be rejected.
+</Warning>
+
+<Steps>
+  <Step title="Close the gym with a custom message">
+    Set `gimnasio_abierto` to `false` and provide a message explaining the closure.
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/configuracion/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gimnasio_abierto": false,
+        "mensaje_cierre": "El gimnasio está cerrado por receso de invierno. Reapertura el 5 de agosto."
+      }'
+    ```
+
+    <ParamField body="gimnasio_abierto" type="boolean">
+      Set to `false` to close the gym.
+    </ParamField>
+    <ParamField body="mensaje_cierre" type="string">
+      Explanation shown to users. Be specific about the reason and expected reopening date.
+    </ParamField>
+  </Step>
+  <Step title="Confirm the updated configuration">
+
+    ```json
+    {
+      "gimnasio_abierto": false,
+      "mensaje_cierre": "El gimnasio está cerrado por receso de invierno. Reapertura el 5 de agosto."
+    }
+    ```
+  </Step>
+</Steps>
+
+## Admin: reopen the gym
+
+When the closure period ends, set `gimnasio_abierto` back to `true`. You can update the message at the same time or leave it for the next closure.
+
+```bash
+curl -X PATCH https://your-api-host/api/configuracion/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gimnasio_abierto": true
+  }'
+```
+
+```json
+{
+  "gimnasio_abierto": true,
+  "mensaje_cierre": "El gimnasio está cerrado por receso de invierno. Reapertura el 5 de agosto."
+}
+```
+
+<Note>
+  The `mensaje_cierre` value persists between closures. Students only see it when `gimnasio_abierto` is `false`, so there is no need to clear it when reopening.
+</Note>
+
+## Common use cases
+
+<AccordionGroup>
+  <Accordion title="University recess">
+    Close the gym during winter or summer recess with a message indicating the scheduled reopening date.
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/configuracion/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gimnasio_abierto": false,
+        "mensaje_cierre": "El gimnasio está cerrado por receso universitario. Regresamos el 3 de marzo."
+      }'
+    ```
+  </Accordion>
+  <Accordion title="Scheduled maintenance">
+    Close temporarily for equipment maintenance or facility work.
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/configuracion/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gimnasio_abierto": false,
+        "mensaje_cierre": "El gimnasio se encuentra cerrado por mantención programada. Reabriremos mañana a las 08:00."
+      }'
+    ```
+  </Accordion>
+  <Accordion title="Emergency closure">
+    Close immediately due to an unexpected event.
+
+    ```bash
+    curl -X PATCH https://your-api-host/api/configuracion/ \
+      -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gimnasio_abierto": false,
+        "mensaje_cierre": "El gimnasio está temporalmente cerrado. Nos disculpamos por los inconvenientes."
+      }'
+    ```
+  </Accordion>
+</AccordionGroup>

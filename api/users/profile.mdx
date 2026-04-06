@@ -1,0 +1,227 @@
+---
+title: 'Profile'
+description: "Retrieve the authenticated user's profile and physical assessment data."
+---
+
+Two endpoints are available for retrieving user data: one for the currently authenticated user, and one for admin-only lookup by RUT.
+
+## Get current user profile
+
+Returns the profile of the user associated with the provided access token, along with their physical assessment record (`ficha_fisica`) if one exists.
+
+<Warning>
+  This endpoint requires a valid Bearer token. Unauthenticated requests return 401.
+</Warning>
+
+### Endpoint
+
+```
+GET /api/usuarios/me/
+```
+
+### Request headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <access_token>`
+</ParamField>
+
+### Response
+
+#### 200 — Success
+
+<ResponseField name="id" type="integer" required>
+  The user's internal database ID.
+</ResponseField>
+
+<ResponseField name="username" type="string" required>
+  The user's RUT in normalized format (uppercase, no dots or spaces).
+</ResponseField>
+
+<ResponseField name="first_name" type="string" required>
+  The user's first name.
+</ResponseField>
+
+<ResponseField name="last_name" type="string" required>
+  The user's last name.
+</ResponseField>
+
+<ResponseField name="rol" type="integer" required>
+  The user's role. `1` = Student, `2` = Trainer, `3` = Admin.
+</ResponseField>
+
+<ResponseField name="es_seleccionado" type="boolean" required>
+  Whether the user is part of a USM sports selection team.
+</ResponseField>
+
+<ResponseField name="rama_deportiva" type="string">
+  The sport branch the user belongs to. Empty or null when `es_seleccionado` is `false`.
+</ResponseField>
+
+<ResponseField name="carrera" type="string" required>
+  The user's academic program.
+</ResponseField>
+
+<ResponseField name="ficha_fisica" type="object">
+  Physical assessment record for the user. Returns `null` if no record has been created yet.
+
+  <Expandable title="ficha_fisica properties">
+    <ResponseField name="id" type="integer">
+      Internal ID of the physical assessment record.
+    </ResponseField>
+    <ResponseField name="usuario" type="integer">
+      ID of the user this record belongs to.
+    </ResponseField>
+    <ResponseField name="peso_kg" type="number">
+      User's weight in kilograms.
+    </ResponseField>
+    <ResponseField name="estatura_cm" type="number">
+      User's height in centimetres.
+    </ResponseField>
+    <ResponseField name="lesiones_previas" type="string">
+      Description of any prior injuries.
+    </ResponseField>
+    <ResponseField name="objetivo_principal" type="string">
+      The user's primary fitness objective.
+    </ResponseField>
+    <ResponseField name="observaciones_entrenador" type="string">
+      Trainer notes and observations.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/usuarios/me/ \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": 42,
+  "username": "12345678K",
+  "first_name": "María",
+  "last_name": "González",
+  "rol": 1,
+  "es_seleccionado": true,
+  "rama_deportiva": "Fútbol",
+  "carrera": "Ingeniería Civil Informática",
+  "ficha_fisica": {
+    "id": 7,
+    "usuario": 42,
+    "peso_kg": 65.5,
+    "estatura_cm": 168,
+    "lesiones_previas": "Esguince tobillo derecho (2022)",
+    "objetivo_principal": "Mejorar resistencia aeróbica",
+    "observaciones_entrenador": "Evitar saltos de impacto por ahora"
+  }
+}
+```
+
+```json 200 (no physical assessment)
+{
+  "id": 43,
+  "username": "98765432J",
+  "first_name": "Carlos",
+  "last_name": "Pérez",
+  "rol": 1,
+  "es_seleccionado": false,
+  "rama_deportiva": "",
+  "carrera": "Ingeniería Mecánica",
+  "ficha_fisica": null
+}
+```
+
+</ResponseExample>
+
+---
+
+## Look up user by RUT
+
+Search for a single user by their RUT. This endpoint is restricted to administrators.
+
+<Warning>
+  Requires Admin role (`rol == 3`). Non-admin requests return 403.
+</Warning>
+
+### Endpoint
+
+```
+GET /api/usuarios/buscar/?rol_usm={rut}
+```
+
+### Request headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <access_token>` — must belong to a user with `rol == 3`.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="rol_usm" type="string" required>
+  The RUT of the user to look up. Must match the normalized stored format (uppercase, no dots or spaces).
+</ParamField>
+
+### Response
+
+#### 200 — Success
+
+Returns a single user object in the same shape as [GET /api/usuarios/me/](#get-current-user-profile).
+
+#### 404 — Not found
+
+```json
+{
+  "error": "Usuario no encontrado."
+}
+```
+
+#### 400 — Missing parameter
+
+```json
+{
+  "error": "Debe proporcionar un rol_usm."
+}
+```
+
+### Example
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url 'https://your-domain.com/api/usuarios/buscar/?rol_usm=12345678K' \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": 42,
+  "username": "12345678K",
+  "first_name": "María",
+  "last_name": "González",
+  "rol": 1,
+  "es_seleccionado": true,
+  "rama_deportiva": "Fútbol",
+  "carrera": "Ingeniería Civil Informática"
+}
+```
+
+```json 404
+{
+  "error": "Usuario no encontrado."
+}
+```
+
+</ResponseExample>

@@ -1,0 +1,83 @@
+---
+title: 'Login'
+description: 'Obtain a JWT access and refresh token pair by authenticating with a username and password.'
+---
+
+Authenticate a user and receive a JWT access token (valid for 1 day) and a refresh token (valid for 7 days). No authentication is required to call this endpoint.
+
+<Warning>
+  Tokens are returned in plain text. Store them securely and never expose them in client-side code or logs.
+</Warning>
+
+## Endpoint
+
+```
+POST /api/login/
+```
+
+## Request
+
+### Body parameters
+
+<ParamField body="username" type="string" required>
+  The user's RUT, formatted as uppercase with no dots or spaces (e.g., `12345678K`). This is the value set at registration.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password.
+</ParamField>
+
+## Response
+
+### 200 — Success
+
+<ResponseField name="access" type="string" required>
+  A signed JWT access token. Valid for **1 day**. Include this as a `Bearer` token in the `Authorization` header for authenticated requests.
+</ResponseField>
+
+<ResponseField name="refresh" type="string" required>
+  A signed JWT refresh token. Valid for **7 days**. Use this to obtain a new access token via [POST /api/login/refresh/](/api/auth/refresh).
+</ResponseField>
+
+### 401 — Unauthorized
+
+Returned when credentials are invalid or the account does not exist.
+
+```json
+{
+  "detail": "No active account found with the given credentials"
+}
+```
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/login/ \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "username": "12345678K",
+    "password": "mypassword123"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzE0MDAwMDAwLCJ1c2VybmFtZSI6IjEyMzQ1Njc4SyJ9.abc123",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTcxNDYwMDAwMCwidXNlcm5hbWUiOiIxMjM0NTY3OEsifQ.xyz789"
+}
+```
+
+```json 401
+{
+  "detail": "No active account found with the given credentials"
+}
+```
+
+</ResponseExample>

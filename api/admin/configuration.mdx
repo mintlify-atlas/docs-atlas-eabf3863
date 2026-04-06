@@ -1,0 +1,125 @@
+---
+title: 'Gym configuration'
+description: 'Read and update global gym settings, including open/closed status.'
+keywords: ['configuration', 'configuracion', 'gym status', 'closed', 'singleton', 'admin']
+---
+
+The gym configuration (`ConfiguracionGimnasio`) is a singleton record that controls whether the gym is open and the message shown when it is closed. There is always exactly one configuration record; it cannot be created or deleted via the API.
+
+## Singleton pattern
+
+<Note>
+The configuration always uses `pk=1`. There is one record and one record only. `GET` reads it; `PATCH` updates it. `POST`, `PUT`, and `DELETE` are not supported.
+</Note>
+
+**Typical use case:** During university recess or maintenance, an admin sets `gimnasio_abierto` to `false` and customises `mensaje_cierre` so that students see a clear explanation when they open the app.
+
+---
+
+## Get gym configuration
+
+```
+GET /api/configuracion/
+```
+
+<Warning>
+Requires authentication. All authenticated roles can read the configuration.
+</Warning>
+
+### Response fields
+
+<ResponseField name="gimnasio_abierto" type="boolean" required>
+  `true` if the gym is currently open, `false` if it is closed.
+</ResponseField>
+
+<ResponseField name="mensaje_cierre" type="string" required>
+  Message displayed to students when the gym is closed. Default: `"El gimnasio se encuentra cerrado por receso universitario o mantención."`.
+</ResponseField>
+
+### Example
+
+```bash
+curl --request GET \
+  --url https://api.example.com/api/configuracion/ \
+  --header 'Authorization: Bearer <token>'
+```
+
+```json
+{
+  "gimnasio_abierto": true,
+  "mensaje_cierre": "El gimnasio se encuentra cerrado por receso universitario o mantención."
+}
+```
+
+---
+
+## Update gym configuration
+
+```
+PATCH /api/configuracion/
+```
+
+<Warning>
+Admin role required (`rol == 3`). Requests from students or trainers return `403 Forbidden`.
+</Warning>
+
+<Note>
+Both fields are optional in a `PATCH` request — omit any field you do not want to change.
+</Note>
+
+### Request parameters
+
+<ParamField body="gimnasio_abierto" type="boolean">
+  Set `false` to close the gym for all students.
+</ParamField>
+
+<ParamField body="mensaje_cierre" type="string">
+  Closing message shown to students. Customise this to explain the reason for closure.
+</ParamField>
+
+### Example — close the gym
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/configuracion/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "gimnasio_abierto": false,
+    "mensaje_cierre": "El gimnasio estará cerrado del 15 al 31 de julio por receso universitario."
+  }'
+```
+
+```json
+{
+  "gimnasio_abierto": false,
+  "mensaje_cierre": "El gimnasio estará cerrado del 15 al 31 de julio por receso universitario."
+}
+```
+
+### Example — reopen the gym
+
+```bash
+curl --request PATCH \
+  --url https://api.example.com/api/configuracion/ \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "gimnasio_abierto": true
+  }'
+```
+
+```json
+{
+  "gimnasio_abierto": true,
+  "mensaje_cierre": "El gimnasio estará cerrado del 15 al 31 de julio por receso universitario."
+}
+```
+
+### Error — insufficient permissions
+
+```json
+{
+  "error": "Solo administradores pueden cambiar esto."
+}
+```

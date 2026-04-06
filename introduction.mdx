@@ -1,0 +1,59 @@
+---
+title: "USM Fitness API"
+description: "REST API for managing gym reservations, training plans, and user attendance at Universidad Santa María."
+---
+
+The USM Fitness API powers the gym management system for Universidad Santa María. It provides endpoints for student registration and login, time block scheduling, gym reservations, training plan management, and physical assessments — all secured with JWT authentication and a three-tier role system.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get your first authenticated request running in minutes
+  </Card>
+  <Card title="Authentication" icon="lock" href="/authentication">
+    Learn how to obtain and use JWT tokens
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/login">
+    Full endpoint documentation with request and response schemas
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/roles-permissions">
+    Understand roles, scheduling, reservations, and the penalization system
+  </Card>
+</CardGroup>
+
+## What you can do
+
+<CardGroup cols={2}>
+  <Card title="Manage reservations" icon="calendar" href="/concepts/reservations">
+    Students book gym time blocks with automatic capacity enforcement and overflow for sports-selected athletes
+  </Card>
+  <Card title="Track attendance" icon="clipboard-check" href="/api/reservations/attendance">
+    Trainers mark attendance after each session; absences trigger the penalization system automatically
+  </Card>
+  <Card title="Assign training plans" icon="dumbbell" href="/guides/training-plans">
+    Trainers create global or personalized workout plans with an interactive exercise catalog
+  </Card>
+  <Card title="Physical assessments" icon="heart-pulse" href="/guides/physical-assessment">
+    Record and update student physical data, injuries, and trainer observations
+  </Card>
+</CardGroup>
+
+## How it works
+
+<Steps>
+  <Step title="Register and log in">
+    Students register with their RUT and university credentials. All users authenticate with JWT tokens issued at `/api/login/`.
+  </Step>
+  <Step title="Browse available blocks">
+    The API auto-generates the weekly schedule every Monday. Students see upcoming blocks with real-time available capacity.
+  </Step>
+  <Step title="Make a reservation">
+    Students book one block per day. The system enforces capacity limits, with overflow allowed for sports-selected athletes.
+  </Step>
+  <Step title="Attend and track progress">
+    Trainers mark attendance after each session. Students can view their training plans and physical assessment card at any time.
+  </Step>
+</Steps>
+
+<Note>
+  The API also exposes interactive Swagger documentation at `/swagger/` on any running instance.
+</Note>

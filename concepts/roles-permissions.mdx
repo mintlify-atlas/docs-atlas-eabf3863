@@ -1,0 +1,97 @@
+---
+title: "Roles and permissions"
+description: "The three-tier role system that controls access to every endpoint in the USM Fitness API."
+keywords: ["roles", "permissions", "admin", "trainer", "student", "es_seleccionado"]
+---
+
+Every user in the system has a `rol` field (integer 1–3) that determines what actions they can perform. A second flag, `es_seleccionado`, grants a specific overflow privilege to student-athletes without changing their base role.
+
+## Role overview
+
+<CardGroup cols={3}>
+  <Card title="Alumno (1)" icon="user">
+    Regular student. Can browse available blocks, make and cancel their own reservations, and view their training plan and physical assessment.
+  </Card>
+  <Card title="Entrenador (2)" icon="dumbbell">
+    Trainer. Can do everything a student can, plus manage attendance, create and assign training plans, and record physical assessments.
+  </Card>
+  <Card title="Administrador (3)" icon="shield">
+    Administrator. Full access. Can manage users, configure time blocks and gym capacity, and access all data across the system.
+  </Card>
+</CardGroup>
+
+## Role comparison
+
+| Capability | Alumno (1) | Entrenador (2) | Admin (3) |
+|---|:---:|:---:|:---:|
+| View available blocks | ✓ | ✓ | ✓ |
+| Create / cancel own reservation | ✓ | ✓ | ✓ |
+| Mark attendance (PRE / AUS) | — | ✓ | ✓ |
+| Create training plans | — | ✓ | ✓ |
+| Record physical assessments | — | ✓ | ✓ |
+| Create / edit time blocks | — | — | ✓ |
+| Manage users | — | — | ✓ |
+| View all reservations | — | — | ✓ |
+
+## Permission classes
+
+The API enforces access via two DRF permission classes:
+
+```python gimnasio/views.py
+class IsAdminUserRole(permissions.BasePermission):
+    """Allows access only to users with rol == 3 (Admin)."""
+
+class IsTrainerOrAdmin(permissions.BasePermission):
+    """Allows access to users with rol in [2, 3] (Trainer or Admin)."""
+```
+
+<Info>
+  All authenticated endpoints also require a valid JWT token in the `Authorization: Bearer <token>` header. See [Authentication](/authentication) for details.
+</Info>
+
+### Endpoint permission requirements
+
+| Endpoint group | Required permission |
+|---|---|
+| `GET /api/bloques/` | Any authenticated user |
+| `POST /api/reservas/` | Any authenticated user |
+| `POST /api/reservas/{id}/cancelar/` | Any authenticated user (own reservation) |
+| `POST /api/reservas/{id}/marcar_asistencia/` | `IsTrainerOrAdmin` |
+| `POST /api/planes/` | Any authenticated user (trainers create, students read) |
+| `POST /api/detallerutina/` | `IsTrainerOrAdmin` |
+| `POST /api/bloques/` | `IsAdminUserRole` |
+| `GET /api/usuarios/buscar/` | `IsAdminUserRole` |
+| `PATCH /api/usuarios/{id}/actualizar_permisos/` | `IsAdminUserRole` |
+
+## The `es_seleccionado` flag
+
+`es_seleccionado` is a boolean field on `Usuario`. It is independent of the base role and applies only to students (`rol == 1`).
+
+When a time block reaches its `aforo_regular` capacity (default 20), the system rejects new reservations from regular students. A student with `es_seleccionado = True` is still allowed to book — the reservation is created with `es_sobrecupo = True` to track that it is an overflow booking.
+
+This flag is intended for athletes who represent the university in an official sports team.
+
+```python gimnasio/models.py
+es_seleccionado: BooleanField   # True → sports-team athlete with overflow privilege
+rama_deportiva: CharField       # e.g., "Balonmano", "Fútbol"
+```
+
+The `rama_deportiva` field stores the sport branch the student belongs to. It is informational and does not affect any business rule beyond `es_seleccionado`.
+
+<Note>
+  Only an administrator can set `es_seleccionado = True` or assign a `rama_deportiva` to a student.
+</Note>
+
+## User identity fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `rut` | `CharField` (unique) | Primary identifier for Chilean ID number |
+| `carrera` | `CharField` | University degree program |
+| `rol` | `IntegerField` | 1 = Alumno, 2 = Entrenador, 3 = Admin |
+| `es_seleccionado` | `BooleanField` | Overflow privilege for sports athletes |
+| `rama_deportiva` | `CharField` | Sport branch (e.g., `"Balonmano"`) |
+| `inasistencias_acumuladas` | `PositiveIntegerField` | Running no-show counter |
+| `bloqueado_hasta` | `DateTimeField` | Null when not blocked |
+
+See [Penalization system](/concepts/penalization-system) for how `inasistencias_acumuladas` and `bloqueado_hasta` are used.
